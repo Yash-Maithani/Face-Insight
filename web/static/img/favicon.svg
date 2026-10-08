@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="7" fill="#1c1c1a"/>
+  <g fill="none" stroke="#ee8a4a" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Scan frame corner brackets -->
+    <g stroke-width="2.2">
+      <path d="M 5 11 V 5.6 L 5.6 5 H 11"/>
+      <path d="M 21 5 H 26.4 L 27 5.6 V 11"/>
+      <path d="M 5 21 V 26.4 L 5.6 27 H 11"/>
+      <path d="M 21 27 H 26.4 L 27 26.4 V 21"/>
+    </g>
+    <!-- Face: eyes, nose, mouth -->
+    <g stroke-width="1.7">
+      <path d="M 9.5 14 C 9.5 11 13.5 11 13.5 14"/>
+      <path d="M 18.5 14 C 18.5 11 22.5 11 22.5 14"/>
+      <path d="M 16 13.5 V 17.5"/>
+      <path d="M 13 21 H 19"/>
+    </g>
+  </g>
+</svg>

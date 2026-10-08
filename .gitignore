@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Local settings. Created on first run; holds your names and database address.
+config.json
+
+# Biometric data. Never commit these.
+ImageData/
+snapshots/
+Trainer.yml
+
+# Firebase service account keys
+*serviceAccount*.json
+*firebase-adminsdk*.json
+
+# Exports
+*.xlsx
+*.csv
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

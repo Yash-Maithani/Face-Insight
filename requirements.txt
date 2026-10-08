@@ -1,0 +1,10 @@
+flask
+flask-socketio
+simple-websocket
+opencv-contrib-python
+tensorflow
+numpy
+pillow
+pymongo
+firebase-admin
+openpyxl
