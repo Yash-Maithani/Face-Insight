@@ -565,8 +565,13 @@ real_cfg_snapshot = json.loads(json.dumps(srv.cfg))
 for i in range(4):
     cv2.imwrite(os.path.join(tmp_del, f"55_{i+1}.jpg"), _make_gray())
 
-# Seed config with person 55 and a second person 56
+# Seed config with person 55 and a second person 56. People live in the
+# database now: start from an empty `persons` collection (test database only)
+# so these two are the only ones registered.
 orig_names = dict(srv.cfg.get("names", {}))
+assert srv.mongo_db._db_name == "face_attendance_test"
+if srv.mongo_db.is_connected:
+    srv.mongo_db.database()["persons"].delete_many({})
 srv.cfg["names"] = {"55": "TestPerson", "56": "OtherPerson"}
 
 # Seed files for person 56 too (so trainer won't fail after delete of 55)

@@ -144,12 +144,12 @@ check("Fingerprint changes when a file changes", server.static_fingerprint(copy_
 section("4. Shell structure")
 
 tabs = re.findall(r'<button class="tab-btn[^"]*" data-tab="(\w+)"', html)
-check("Sidebar has the six sections in order",
-      tabs == ["monitor", "attendance", "dashboard", "register", "settings", "audit"], str(tabs))
+check("Sidebar has the eight sections in order",
+      tabs == ["monitor", "attendance", "people", "dashboard", "reports", "register", "settings", "audit"], str(tabs))
 check("Sidebar is a vertical tab list", 'aria-orientation="vertical"' in html)
 for item in ("sbCamera", "sbDatabase", "sbSocket", "sbUpdated"):
     check(f"Status bar has #{item}", f'id="{item}"' in html)
-for panel in ("monitor", "attendance", "dashboard", "register", "settings", "audit"):
+for panel in ("monitor", "attendance", "people", "dashboard", "reports", "register", "settings", "audit"):
     check(f"Panel {panel} has its own heading", f'<h2 class="panel-title" id="title-{panel}">' in html)
 check("Event list has Pause and Clear", 'id="btnFeedPause"' in html and 'id="btnFeedClear"' in html)
 check("Dark mode is the default before first paint", 'prefs.mode || stored.mode || "dark"' in html)

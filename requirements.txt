@@ -10,3 +10,4 @@ pillow
 pymongo
 firebase-admin
 openpyxl
+reportlab

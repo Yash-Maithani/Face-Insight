@@ -261,6 +261,40 @@
         return confirmed ? fetch(url, opts) : null;
     }
 
+    // ── Dates ────────────────────────────────────────────────────────────
+    // Local calendar dates as YYYY-MM-DD, the format the API uses.
+    function isoDate(d) {
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    const dates = {
+        iso: isoDate,
+        today: () => isoDate(new Date()),
+        // A real date, not after today
+        isPast(str) {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(str || "")) return false;
+            const d = new Date(str + "T00:00:00");
+            return !isNaN(d.getTime()) && isoDate(d) === str && str <= isoDate(new Date());
+        },
+        addDays(str, n) {
+            const d = new Date(str + "T00:00:00");
+            d.setDate(d.getDate() + n);
+            return isoDate(d);
+        },
+        // Days from one date to the other, counting both
+        span(from, to) {
+            return Math.round((new Date(to + "T00:00:00") - new Date(from + "T00:00:00")) / 86400000) + 1;
+        },
+        // "from..to" as kept in the URL; null if it is not a valid past range
+        parseRange(arg, maxDays) {
+            const m = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/.exec(arg || "");
+            if (!m || !dates.isPast(m[1]) || !dates.isPast(m[2]) || m[1] > m[2]) return null;
+            if (maxDays && dates.span(m[1], m[2]) > maxDays) return null;
+            return { from: m[1], to: m[2] };
+        },
+    };
+
     // ── Download ─────────────────────────────────────────────────────────
     // Starts a file download without navigating away, so a page with unsaved
     // settings does not ask "leave site?".
@@ -442,7 +476,9 @@
     const TAB_TITLES = {
         monitor: "Live Monitor",
         attendance: "Attendance",
+        people: "People",
         dashboard: "Dashboard",
+        reports: "Reports",
         register: "Register",
         settings: "Settings",
         audit: "Audit log",
@@ -1014,6 +1050,7 @@
         confirm: confirmDialog,
         fetchFresh,
         download,
+        dates,
         showToast,
         setKpi,
         staggerIn,

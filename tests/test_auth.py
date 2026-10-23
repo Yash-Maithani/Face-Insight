@@ -263,7 +263,10 @@ throttle.succeeded(TEST_USER, "127.0.0.1")
 res = f.post("/api/auth/confirm", json={"password": TEST_PASSWORD})
 check("Right confirmation -> 200", res.status_code == 200 and res.get_json().get("ok") is True)
 res = f.delete("/api/persons/99999")
-check("Destructive route runs after confirming (404 for a missing person)", res.status_code == 404)
+# Past the password check: 404 for a missing person, or 503 because this
+# test's database address is deliberately unreachable
+check("Destructive route runs after confirming (no password request)",
+      res.status_code in (404, 503) and not (res.get_json() or {}).get("fresh_required"), str(res.status_code))
 
 # ──────────────────────────────────────────────────────────────────────────
 section("8. Accounts API")

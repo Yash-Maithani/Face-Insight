@@ -30,9 +30,17 @@
                 <svg class="tab-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m16 11 2 2 4-4"/><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
                 <span class="tab-btn__label">Attendance</span>
             </button>
+            <button class="tab-btn" data-tab="people" role="tab" aria-selected="false" aria-controls="panel-people" title="People">
+                <svg class="tab-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span class="tab-btn__label">People</span>
+            </button>
             <button class="tab-btn" data-tab="dashboard" role="tab" aria-selected="false" aria-controls="panel-dashboard" title="Dashboard">
                 <svg class="tab-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
                 <span class="tab-btn__label">Dashboard</span>
+            </button>
+            <button class="tab-btn" data-tab="reports" role="tab" aria-selected="false" aria-controls="panel-reports" title="Reports">
+                <svg class="tab-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                <span class="tab-btn__label">Reports</span>
             </button>
             <button class="tab-btn" data-tab="register" role="tab" aria-selected="false" aria-controls="panel-register" title="Register">
                 <svg class="tab-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
@@ -216,16 +224,19 @@
         <section class="panel" id="panel-attendance" role="tabpanel" aria-labelledby="title-attendance">
             <div class="panel-head">
                 <h2 class="panel-title" id="title-attendance">Attendance</h2>
-                <p class="panel-sub">Every record for one day. Select a row to see its details.</p>
+                <p class="panel-sub">Every record for one day or a date range. Select a row to see its details.</p>
             </div>
             <!-- Date navigation & Actions -->
             <div class="panel-header-row">
                 <div class="date-nav">
-                    <button class="btn btn--ghost btn--sm" id="btnDatePrev" title="Previous Day" aria-label="Previous day">
+                    <button class="btn btn--ghost btn--sm" id="btnDatePrev" title="Previous period" aria-label="Previous period">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 18 9 12 15 6"/></svg>
                     </button>
+                    <label class="date-nav__label" for="attendanceDatePicker">From</label>
                     <input type="date" id="attendanceDatePicker" class="input-date">
-                    <button class="btn btn--ghost btn--sm" id="btnDateNext" title="Next Day" aria-label="Next day">
+                    <label class="date-nav__label" for="attendanceDateTo">To</label>
+                    <input type="date" id="attendanceDateTo" class="input-date">
+                    <button class="btn btn--ghost btn--sm" id="btnDateNext" title="Next period" aria-label="Next period">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"/></svg>
                     </button>
                     <button class="btn btn--ghost btn--sm" id="btnDateToday">Today</button>
@@ -294,6 +305,7 @@
                     <table class="data-table data-table--stack" id="attendanceTable">
                         <thead>
                             <tr>
+                                <th data-col="date" class="sortable" tabindex="0" data-key-activate id="attendanceDateCol" hidden>Date <span class="sort-icon"></span></th>
                                 <th data-col="name" class="sortable" tabindex="0" data-key-activate>Name <span class="sort-icon"></span></th>
                                 <th data-col="person_id" class="sortable col-num" tabindex="0" data-key-activate>ID <span class="sort-icon"></span></th>
                                 <th data-col="time_in" class="sortable" tabindex="0" data-key-activate>Time In <span class="sort-icon"></span></th>
@@ -376,7 +388,19 @@
                         <button type="button" class="mode-switch__btn" data-range="7" aria-pressed="true">7 days</button>
                         <button type="button" class="mode-switch__btn" data-range="14" aria-pressed="false">14 days</button>
                         <button type="button" class="mode-switch__btn" data-range="30" aria-pressed="false">30 days</button>
+                        <button type="button" class="mode-switch__btn" data-range="custom" aria-pressed="false">Custom</button>
                     </div>
+                </div>
+                <div class="range-custom" id="dashboardCustom" hidden>
+                    <div class="form-group">
+                        <label for="dashboardFrom" class="form-label">From</label>
+                        <input type="date" id="dashboardFrom" class="input-date form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="dashboardTo" class="form-label">To</label>
+                        <input type="date" id="dashboardTo" class="input-date form-input">
+                    </div>
+                    <span class="field-error" id="errDashboardRange" role="alert"></span>
                 </div>
             </div>
 
@@ -474,6 +498,14 @@
                             </div>
                             <input type="range" id="registerMaxImages" class="input-range" min="20" max="2000" step="10" value="500">
                         </div>
+                        <div class="form-group consent" id="registerConsentGroup">
+                            <label class="consent__label">
+                                <input type="checkbox" id="registerConsent">
+                                <span>This person agrees to have face images taken and stored on this computer, and used to record their attendance.</span>
+                            </label>
+                            <span class="field-error" id="errRegisterConsent" role="alert"></span>
+                        </div>
+                        <p class="form-hint" id="registerConsentDone" hidden></p>
                         <div class="form-actions">
                             <button type="button" class="btn btn--primary" id="btnCollectStart">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16"/></svg>
@@ -516,7 +548,8 @@
                             </div>
                         </div>
                     </div>
-                    <p class="preview-hint">Slowly turn your head and vary the lighting for better recognition.</p>
+                    <p class="collect-prompt" id="collectPrompt" aria-live="polite" hidden></p>
+                    <p class="preview-hint">During collection, a prompt here asks the person to turn their head, so the images cover several angles.</p>
                 </div>
 
                 <!-- Model Training Card -->
@@ -590,7 +623,7 @@
         <section class="panel" id="panel-settings" role="tabpanel" aria-labelledby="title-settings">
             <div class="panel-head">
                 <h2 class="panel-title" id="title-settings">Settings</h2>
-                <p class="panel-sub">Appearance, accounts, database, attendance rules and names.</p>
+                <p class="panel-sub">Appearance, accounts, database and attendance rules. Names are changed on the People page.</p>
             </div>
             <div class="settings-grid">
                 <!-- Appearance -->
@@ -723,39 +756,20 @@
                                 <span class="field-error" id="errWorkingEnd"></span>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Name / ID Manager -->
-                <div class="card settings-names-card">
-                    <div class="card__header">
-                        <h3 class="card__title">Name / ID Manager</h3>
-                        <span class="card__badge-sub">Assign names to person IDs. Deleting a name here does NOT delete image files.</span>
-                    </div>
-                    <div class="card__body">
-                        <!-- Add Name Row -->
-                        <div class="add-name-row">
-                            <input type="number" id="newNameId" class="form-input form-input--sm" placeholder="ID (e.g. 1)" min="0">
-                            <input type="text" id="newNameVal" class="form-input form-input--sm" placeholder="Name (e.g. Alice)">
-                            <button type="button" class="btn btn--primary btn--sm" id="btnAddName">Add Name</button>
-                        </div>
-                        <span class="field-error" id="errNewName"></span>
-
-                        <!-- Names List -->
-                        <div class="names-list-table-wrap">
-                            <table class="data-table" id="namesTable">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Name</th>
-                                        <th style="text-align:right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="namesTableBody">
-                                    <tr><td colspan="3" class="table-empty">No names configured yet.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <fieldset class="form-group working-days">
+                            <legend class="form-label">Working days</legend>
+                            <div class="check-chips" id="settingsWorkingDays">
+                                <label class="check-chip"><input type="checkbox" name="workingDay" value="0"><span>Mon</span></label>
+                                <label class="check-chip"><input type="checkbox" name="workingDay" value="1"><span>Tue</span></label>
+                                <label class="check-chip"><input type="checkbox" name="workingDay" value="2"><span>Wed</span></label>
+                                <label class="check-chip"><input type="checkbox" name="workingDay" value="3"><span>Thu</span></label>
+                                <label class="check-chip"><input type="checkbox" name="workingDay" value="4"><span>Fri</span></label>
+                                <label class="check-chip"><input type="checkbox" name="workingDay" value="5"><span>Sat</span></label>
+                                <label class="check-chip"><input type="checkbox" name="workingDay" value="6"><span>Sun</span></label>
+                            </div>
+                            <p class="form-hint">A day without records counts as Absent only on a working day.</p>
+                            <span class="field-error" id="errWorkingDays"></span>
+                        </fieldset>
                     </div>
                 </div>
 
@@ -839,6 +853,204 @@
             </div>
         </section>
 
+        <!-- People -->
+        <section class="panel" id="panel-people" role="tabpanel" aria-labelledby="title-people">
+            <div class="panel-head">
+                <h2 class="panel-title" id="title-people">People</h2>
+                <p class="panel-sub">Everyone registered, and each person's attendance day by day.</p>
+            </div>
+
+            <div id="peopleListView">
+                <div class="panel-header-row">
+                    <div class="form-group people-search">
+                        <label for="peopleSearch" class="form-label">Search</label>
+                        <input type="search" id="peopleSearch" class="form-input" placeholder="Name or ID" autocomplete="off">
+                    </div>
+                </div>
+                <div class="card table-card">
+                    <div class="table-responsive">
+                        <table class="data-table data-table--stack people-table" id="peopleTable" hidden>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th class="col-num">ID</th>
+                                    <th class="col-num">Images</th>
+                                    <th>Consent</th>
+                                    <th>Last seen</th>
+                                </tr>
+                            </thead>
+                            <tbody id="peopleTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="table-empty" id="peopleEmpty"></div>
+                </div>
+            </div>
+
+            <div id="personView" hidden>
+                <div class="panel-header-row">
+                    <button type="button" class="btn btn--ghost btn--sm" id="btnPeopleBack">
+                        <svg class="btn__icon" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                        All people
+                    </button>
+                    <div class="range-custom">
+                        <div class="form-group">
+                            <label for="personFrom" class="form-label">From</label>
+                            <input type="date" id="personFrom" class="input-date form-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="personTo" class="form-label">To</label>
+                            <input type="date" id="personTo" class="input-date form-input">
+                        </div>
+                        <span class="field-error" id="errPersonRange" role="alert"></span>
+                    </div>
+                </div>
+
+                <div class="card person-card">
+                    <div class="person-card__head">
+                        <h3 class="person-card__name" id="personName">--</h3>
+                        <dl class="person-card__meta">
+                            <div><dt>ID</dt><dd class="mono" id="personId">--</dd></div>
+                            <div><dt>Images</dt><dd class="mono" id="personImages">--</dd></div>
+                            <div><dt>Consent</dt><dd id="personConsent">--</dd></div>
+                        </dl>
+                    </div>
+                    <form class="person-rename" id="personRenameForm" autocomplete="off">
+                        <label for="personNewName" class="form-label">Name</label>
+                        <div class="person-rename__row">
+                            <input id="personNewName" class="form-input" maxlength="50" required>
+                            <button type="submit" class="btn btn--ghost btn--sm">Rename</button>
+                        </div>
+                        <span class="field-error" id="errPersonRename" role="alert"></span>
+                    </form>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <span class="kpi-label"><span class="shape shape--present" aria-hidden="true"></span>Days present</span>
+                        <span class="kpi-value" id="personKpiPresent">--</span>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label"><span class="shape shape--late" aria-hidden="true"></span>Days late</span>
+                        <span class="kpi-value" id="personKpiLate">--</span>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label"><span class="shape shape--absent" aria-hidden="true"></span>Days absent</span>
+                        <span class="kpi-value" id="personKpiAbsent">--</span>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">Records</span>
+                        <span class="kpi-value" id="personKpiRecords">--</span>
+                    </div>
+                </div>
+
+                <div class="card table-card">
+                    <div class="card__header">
+                        <h3 class="card__title">Day by day</h3>
+                        <span class="card__badge-sub">Select a day to see the records behind it.</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table data-table--stack" id="personDaysTable" hidden>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>First seen</th>
+                                    <th>Last seen</th>
+                                    <th class="col-num">Records</th>
+                                </tr>
+                            </thead>
+                            <tbody id="personDaysBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="table-empty" id="personDaysEmpty"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Reports -->
+        <section class="panel" id="panel-reports" role="tabpanel" aria-labelledby="title-reports">
+            <div class="panel-head">
+                <h2 class="panel-title" id="title-reports">Reports</h2>
+                <p class="panel-sub">One row per person per day for the dates and people you choose. Download it as CSV or PDF.</p>
+            </div>
+
+            <div class="card report-form">
+                <div class="report-form__row">
+                    <div class="form-group">
+                        <label for="reportFrom" class="form-label">From</label>
+                        <input type="date" id="reportFrom" class="input-date form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="reportTo" class="form-label">To</label>
+                        <input type="date" id="reportTo" class="input-date form-input">
+                    </div>
+                    <div class="report-form__actions">
+                        <button type="button" class="btn btn--ghost" id="btnReportCsv" disabled>
+                            <svg class="btn__icon" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            CSV
+                        </button>
+                        <button type="button" class="btn btn--ghost" id="btnReportPdf" disabled>
+                            <svg class="btn__icon" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            PDF
+                        </button>
+                    </div>
+                </div>
+                <span class="field-error" id="errReportRange" role="alert"></span>
+                <fieldset class="report-people">
+                    <legend class="form-label">People</legend>
+                    <label class="check-chip"><input type="checkbox" id="reportEveryone" checked><span>Everyone</span></label>
+                    <div class="check-chips" id="reportPeopleList"></div>
+                </fieldset>
+            </div>
+
+            <div class="card table-card">
+                <div class="card__header">
+                    <h3 class="card__title">Days per person</h3>
+                    <span class="card__badge-sub" id="reportSummaryNote"></span>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table data-table--stack" id="reportTotalsTable" hidden>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th class="col-num">ID</th>
+                                <th class="col-num">Present</th>
+                                <th class="col-num">Late</th>
+                                <th class="col-num">Absent</th>
+                                <th class="col-num">Not seen yet</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportTotalsBody"></tbody>
+                    </table>
+                </div>
+                <div class="table-empty" id="reportEmpty"></div>
+            </div>
+
+            <div class="card table-card" id="reportRowsCard" hidden>
+                <div class="card__header">
+                    <h3 class="card__title">Every day</h3>
+                    <span class="card__badge-sub">The same rows as the CSV and PDF.</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table data-table--stack" id="reportRowsTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th class="col-num">ID</th>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>First seen</th>
+                                <th>Last seen</th>
+                                <th class="col-num">Records</th>
+                                <th>Manual</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportRowsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
         <!-- Audit log -->
         <section class="panel" id="panel-audit" role="tabpanel" aria-labelledby="title-audit">
             <div class="panel-head">
@@ -917,5 +1129,7 @@
     <script src="/static/js/register.js?v={{ asset_v }}"></script>
     <script src="/static/js/settings.js?v={{ asset_v }}"></script>
     <script src="/static/js/audit.js?v={{ asset_v }}"></script>
+    <script src="/static/js/people.js?v={{ asset_v }}"></script>
+    <script src="/static/js/reports.js?v={{ asset_v }}"></script>
 </body>
 </html>

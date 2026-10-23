@@ -14,15 +14,19 @@ This is version 1. It is meant for one PC with one camera, on a network you trus
 
 **Live Monitor.** The camera feed with a box and a name on every face, live counts, and a running list of who was just logged. Click an entry to open its record.
 
-**Attendance.** One day at a time. Filter by Present, Late or Unknown, sort the table, open a record to see the face crop that triggered it, mark someone by hand, export the day to Excel or CSV, and delete an entry that should not be there.
+**Attendance.** One day or a date range. Filter by Present, Late or Unknown, sort the table, open a record to see the face crop that triggered it, mark a registered person by hand, export to Excel or CSV, and delete an entry that should not be there.
 
-**Dashboard.** Totals for today, an attendance trend over 7, 14 or 30 days, today's expressions, and how many days each person attended.
+**People.** Everyone registered, with a search. Each person has a page with their attendance day by day over any date range: Present, Late or Absent, when they were first and last seen, and the records behind each day. Names are changed here.
 
-**Register.** Capture face images for a new person straight from the camera, then train the recogniser. The new model is picked up without restarting.
+**Dashboard.** Totals for today, an attendance trend over 7, 14 or 30 days or dates you pick, today's expressions, and how many days each person attended.
+
+**Reports.** Pick dates and people, check the table, and download it as CSV or PDF. Both files hold the same rows: one per person per day.
+
+**Register.** Capture face images for a new person straight from the camera, then train the recogniser. The person has to agree first, and the time they agreed is stored. Prompts on the page ask them to turn their head, so the images cover several angles. The new model is picked up without restarting.
 
 **Audit log.** Sign-ins, failed sign-ins and every change or delete, with who did it and when. Filter by person, action and date.
 
-**Settings.** Light, dark or system mode, eight colour themes and four fonts (saved to your account), admin accounts, the database connection, the late cut-off and cooldown, the list of names, and a reset for today's records.
+**Settings.** Light, dark or system mode, eight colour themes and four fonts (saved to your account), admin accounts, the database connection, the late cut-off, cooldown and working days, and a reset for today's records.
 
 ## How it works
 
@@ -82,7 +86,9 @@ These are stored in `config.json`, which is created the first time you run the a
 server.py          Flask app: routes, socket handlers, wiring
 auth/              accounts, sign-in and the audit log
 core/              camera loop, detection, image collection, training
-attendance/        attendance rules and Excel/CSV export
+attendance/        attendance rules, daily summary, reports and exports
+people/            registered people, the data migration, People and Reports APIs
+tools/             migrate_v2.py, to run the data migration by hand
 db/                MongoDB wrapper and the optional Firebase mirror
 models/            Haar cascade and the expression model
 web/templates/     the app page, plus sign-in and first-run setup
@@ -103,7 +109,7 @@ The tests are plain Python scripts, so there is nothing extra to install. They w
 
 ## Your data
 
-Face images (`ImageData/`), face crops (`snapshots/`), the trained model (`Trainer.yml`), `config.json` and `instance/` (accounts, the session key and audit entries kept while the database was offline) are all listed in `.gitignore`. They stay on your machine. If you fork this, keep it that way: most of those files are biometric data about real people, and the rest hold your accounts.
+Face images (`ImageData/`), face crops (`snapshots/`), the trained model (`Trainer.yml`), `config.json` and `instance/` (accounts, the session key, audit entries kept while the database was offline, and backups made before a data migration) are all listed in `.gitignore`. They stay on your machine. If you fork this, keep it that way: most of those files are biometric data about real people, and the rest hold your accounts.
 
 Ask people before you register their face.
 
@@ -112,7 +118,8 @@ Ask people before you register their face.
 - **Every account is an admin.** There are no read-only accounts yet. Deleting a person or clearing a day asks for your password again, and the **Audit log** tab shows who did what.
 - **Recognition is basic.** LBPH is sensitive to lighting, angle and glasses, and there is no liveness check, so a photo held up to the camera can pass. I have not measured its accuracy.
 - **Expression is a rough guess.** Treat it as a curiosity, not a fact about someone.
-- **Records are per sighting.** A person gets a new row every time the cooldown runs out, not one check-in per day.
+- **Absent means "no record on a working day".** There is one set of working days and one late cut-off for everyone; per-group schedules are not there yet. Left early is not worked out.
+- **PDF reports use a standard font.** Names in scripts other than Latin may not show correctly in the PDF. The CSV is fine.
 - **Only tried on Windows.**
 
 [docs/roadmap.md](docs/roadmap.md) covers what the next version needs.

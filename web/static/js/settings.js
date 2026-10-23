@@ -1,7 +1,7 @@
 /* ==========================================================================
    settings.js - Settings Tab
-   Appearance, database config, Firebase sync, attendance rules, and
-   Name/ID manager.
+   Appearance, database config, Firebase sync, attendance rules (with
+   working days), accounts and the danger zone. Names live on the People page.
    ========================================================================== */
 
 (function () {
@@ -25,12 +25,8 @@
     const errWorkingEnd = document.getElementById("errWorkingEnd");
     const errMongoUri = document.getElementById("errMongoUri");
     const errMongoDb = document.getElementById("errMongoDb");
-    const errNewName = document.getElementById("errNewName");
-
-    const inputNewNameId = document.getElementById("newNameId");
-    const inputNewNameVal = document.getElementById("newNameVal");
-    const btnAddName = document.getElementById("btnAddName");
-    const namesTableBody = document.getElementById("namesTableBody");
+    const errWorkingDays = document.getElementById("errWorkingDays");
+    const workingDayBoxes = document.querySelectorAll('#settingsWorkingDays input[name="workingDay"]');
 
     const btnSave = document.getElementById("btnSaveSettings");
     const saveStatus = document.getElementById("settingsSaveStatus");
@@ -39,9 +35,6 @@
     const saveBar = document.querySelector(".settings-save-bar");
     const settingsPanel = document.getElementById("panel-settings");
     const settingsTabBtn = document.querySelector('.tab-btn[data-tab="settings"]');
-
-    // Local state for names dictionary { [id: string]: string }
-    let localNames = {};
 
     // ── Unsaved changes ──────────────────────────────────────────────────
     // savedSnapshot is the form as last loaded or saved. While the form
@@ -58,9 +51,14 @@
                 cooldown_minutes: parseInt(inputCooldown.value, 10),
                 late_after: inputLateAfter.value,
                 working_hours_end: inputWorkingEnd.value,
+                working_days: checkedWorkingDays(),
             },
-            names: localNames,
         };
+    }
+
+    // Weekday numbers, Monday = 0
+    function checkedWorkingDays() {
+        return Array.from(workingDayBoxes).filter((b) => b.checked).map((b) => Number(b.value));
     }
 
     function isDirty() {
@@ -251,95 +249,16 @@
             if (inputLateAfter) inputLateAfter.value = att.late_after || "09:30";
             if (inputWorkingEnd) inputWorkingEnd.value = att.working_hours_end || "17:30";
 
-            localNames = Object.assign({}, cfg.names || {});
-            renderNames();
+            const days = Array.isArray(att.working_days) && att.working_days.length ? att.working_days : [0, 1, 2, 3, 4];
+            workingDayBoxes.forEach((b) => {
+                b.checked = days.includes(Number(b.value));
+            });
             savedSnapshot = JSON.stringify(currentPayload());
             updateDirtyUi();
         } catch (err) {
             console.error("loadConfig error:", err);
             window.App.showToast("Failed to load settings", "error");
         }
-    }
-
-    // ── Names Table Rendering ────────────────────────────────────────────
-    function renderNames() {
-        if (!namesTableBody) return;
-
-        const keys = Object.keys(localNames).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
-        if (keys.length === 0) {
-            namesTableBody.innerHTML = `<tr><td colspan="3" class="table-empty"></td></tr>`;
-            window.App.renderState(namesTableBody.querySelector("td"), "empty", "No names yet. Add one above.");
-            return;
-        }
-
-        namesTableBody.innerHTML = keys
-            .map((id) => {
-                const name = localNames[id];
-                return `
-                <tr data-id="${id}">
-                    <td><code>${window.App.escapeHtml(id)}</code></td>
-                    <td>
-                        <input type="text" class="form-input form-input--sm name-edit-input" data-id="${id}" value="${window.App.escapeHtml(name)}">
-                    </td>
-                    <td style="text-align:right">
-                        <button type="button" class="btn btn--ghost btn--sm btn-remove-name" data-id="${id}" title="Remove name from config (does NOT delete images)">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                            Remove
-                        </button>
-                    </td>
-                </tr>
-            `;
-            })
-            .join("");
-
-        // Listen for inline edits
-        namesTableBody.querySelectorAll(".name-edit-input").forEach((inp) => {
-            inp.addEventListener("change", () => {
-                const id = inp.dataset.id;
-                const val = inp.value.trim();
-                if (val) {
-                    localNames[id] = val;
-                } else {
-                    inp.value = localNames[id];
-                }
-            });
-        });
-
-        // Listen for remove buttons
-        namesTableBody.querySelectorAll(".btn-remove-name").forEach((btn) => {
-            btn.addEventListener("click", () => {
-                const id = btn.dataset.id;
-                delete localNames[id];
-                renderNames();
-                updateDirtyUi();
-                window.App.showToast(`Removed ID ${id} from names list (image files kept)`, "info");
-            });
-        });
-    }
-
-    // ── Add Name ─────────────────────────────────────────────────────────
-    if (btnAddName) {
-        btnAddName.addEventListener("click", () => {
-            if (errNewName) errNewName.textContent = "";
-
-            const id = inputNewNameId.value.trim();
-            const val = inputNewNameVal.value.trim();
-
-            if (!id || isNaN(parseInt(id, 10)) || parseInt(id, 10) < 0) {
-                if (errNewName) errNewName.textContent = "ID must be a non-negative integer";
-                return;
-            }
-            if (!val) {
-                if (errNewName) errNewName.textContent = "Name cannot be empty";
-                return;
-            }
-
-            localNames[id] = val;
-            inputNewNameId.value = "";
-            inputNewNameVal.value = "";
-            renderNames();
-            updateDirtyUi();
-        });
     }
 
     // ── Test MongoDB Connection ──────────────────────────────────────────
@@ -405,6 +324,11 @@
                 clientValid = false;
             }
 
+            if (checkedWorkingDays().length === 0) {
+                if (errWorkingDays) errWorkingDays.textContent = "Pick at least one working day";
+                clientValid = false;
+            }
+
             if (!clientValid) {
                 window.App.showToast("Please correct the highlighted errors", "error");
                 return;
@@ -431,8 +355,8 @@
                         errLateAfter.textContent = data.error;
                     } else if (data.field === "working_hours_end" && errWorkingEnd) {
                         errWorkingEnd.textContent = data.error;
-                    } else if (data.field === "names" && errNewName) {
-                        errNewName.textContent = data.error;
+                    } else if (data.field === "working_days" && errWorkingDays) {
+                        errWorkingDays.textContent = data.error;
                     }
                     window.App.showToast(data.error || "Failed to save settings", "error");
                     if (saveStatus) saveStatus.textContent = "Failed to save";

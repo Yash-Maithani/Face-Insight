@@ -9,7 +9,7 @@ import hashlib
 import logging
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import re
 import shutil
@@ -23,7 +23,7 @@ from flask_socketio import SocketIO, emit
 from core.model_loader import (
     load_config, save_config, CONFIG_PATH,
     load_haar_cascade, load_recognizer, load_emotion_model,
-    build_emotion_labels, build_names,
+    build_emotion_labels,
 )
 from db.mongo_client import MongoAttendanceDB, mask_mongo_uri
 from db.firebase_client import FirebaseClient
@@ -35,6 +35,10 @@ from core.trainer import ModelTrainer
 from auth.audit import AuditLog
 from auth.store import UserStore, prefs_of
 from auth.web import fresh_required, init_auth, load_secret_key
+from attendance.reports import RangeError, parse_range
+from people.migration import migrate
+from people.registry import PersonError, PersonRegistry
+from people.web import create_blueprint as people_blueprint
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -76,7 +80,6 @@ cascade = load_haar_cascade()
 recognizer, recognizer_ready = load_recognizer(cfg["trainer_file"])
 emotion_model = load_emotion_model(cfg["emotion_model"])
 emotion_labels = build_emotion_labels(cfg)
-names = build_names(cfg)
 
 models = {
     "cascade": cascade,
@@ -90,9 +93,8 @@ models = {
 mongo_db = MongoAttendanceDB(cfg["mongodb_uri"], cfg["mongodb_db"])
 firebase = FirebaseClient(cfg.get("firebase_credentials", ""), cfg.get("firebase_url", ""))
 
-# Engine
+# Engine (names are set from the people registry below)
 engine = AttendanceEngine(cfg, mongo_db, firebase)
-engine.set_names(names)
 
 # Flask + SocketIO
 app = Flask(
@@ -120,6 +122,59 @@ trainer = ModelTrainer(cfg, models, recognizer_lock, socketio)
 logger.info("Probing cameras...")
 available_cameras = _detect_cameras()
 logger.info("Available cameras: %s", available_cameras)
+
+# Registered people. The `persons` collection is the source of truth; the
+# config keeps a copy of the names so faces still get names while the
+# database is down. load_config/save_config are looked up at call time.
+BACKUP_DIR = os.path.join(INSTANCE_DIR, "backups")
+people = PersonRegistry(
+    lambda: mongo_db,
+    lambda: load_config(),
+    lambda current: save_config(current),
+    on_change=lambda names: detector.update_names(names),
+)
+
+
+def _run_migration():
+    """Move people into the database and fix old Unknown records, once.
+    Backs up first; does nothing when there is nothing to change."""
+    try:
+        report = migrate(mongo_db, people, BACKUP_DIR)
+    except Exception as exc:  # the backup was written before any change
+        logger.error("Migration failed: %s", exc)
+        report = None
+    detector.update_names(people.names())
+    return report
+
+
+_run_migration()
+
+
+def _image_counts():
+    """{person_id: number of face images} from the flat files in the data folder."""
+    current = load_config()
+    data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), current.get("data_folder", "ImageData"))
+    counts = {}
+    if os.path.isdir(data_path):
+        for fname in os.listdir(data_path):
+            if not fname.lower().endswith((".jpg", ".png", ".jpeg")):
+                continue
+            if os.path.isdir(os.path.join(data_path, fname)):
+                continue
+            stem = os.path.splitext(fname)[0]
+            if "_" in stem:
+                try:
+                    pid = int(stem.split("_", 1)[0])
+                except ValueError:
+                    continue
+                counts[pid] = counts.get(pid, 0) + 1
+    return counts
+
+
+app.register_blueprint(people_blueprint(
+    lambda: mongo_db, people, lambda: load_config(),
+    lambda *a, **k: audit_event(*a, **k), _image_counts,
+))
 
 
 # ── Asset cache-busting ────────────────────────────────────────────
@@ -189,6 +244,18 @@ def camera_stop():
     return jsonify({"ok": True})
 
 
+def _parse_day_or_range(req):
+    """(from, to, error). ?from=&to= for a range, ?date= for one day, today by default."""
+    if req.args.get("from") or req.args.get("to"):
+        try:
+            date_from, date_to = parse_range(req.args.get("from"), req.args.get("to"))
+        except RangeError as exc:
+            return None, None, str(exc)
+        return date_from, date_to, None
+    date_str, err = _parse_date_arg(req)
+    return date_str, date_str, err
+
+
 def _parse_date_arg(req):
     date_str = req.args.get("date")
     if not date_str:
@@ -202,10 +269,10 @@ def _parse_date_arg(req):
 
 @app.route("/api/attendance", methods=["GET"])
 def attendance_list():
-    date_str, err = _parse_date_arg(request)
+    date_from, date_to, err = _parse_day_or_range(request)
     if err:
         return jsonify({"error": err}), 400
-    records = mongo_db.get_logs_by_date(date_str)
+    records = mongo_db.get_logs_between(date_from, date_to)
     for r in records:
         if "created_at" in r and hasattr(r["created_at"], "isoformat"):
             r["created_at"] = r["created_at"].isoformat()
@@ -288,8 +355,8 @@ def attendance_delete_today():
 def attendance_manual():
     data = request.get_json(silent=True) or {}
     status = data.get("status")
-    if status not in ("Present", "Late", "Unknown"):
-        return jsonify({"error": "Status must be Present, Late, or Unknown"}), 400
+    if status not in ("Present", "Late"):
+        return jsonify({"error": "Status must be Present or Late"}), 400
 
     name = data.get("name")
     if not name or not isinstance(name, str) or not name.strip():
@@ -299,6 +366,14 @@ def attendance_manual():
     person_id = data.get("person_id")
     if person_id is None or not isinstance(person_id, int) or isinstance(person_id, bool):
         return jsonify({"error": "person_id must be an integer"}), 400
+
+    # Only registered people, under their registered name
+    person = people.get(person_id)
+    if person is None:
+        return jsonify({"error": f"No one is registered with ID {person_id}."}), 404
+    if person["name"].casefold() != " ".join(name.split()).casefold():
+        return jsonify({"error": f"ID {person_id} is {person['name']}, not {name}."}), 400
+    name = person["name"]
 
     record = engine.manual_mark(person_id, name, status)
     if not record:
@@ -334,10 +409,12 @@ def attendance_snapshot(record_id):
 
 @app.route("/api/export/excel", methods=["GET"])
 def export_excel():
-    date_str, err = _parse_date_arg(request)
+    date_from, date_to, err = _parse_day_or_range(request)
     if err:
         return jsonify({"error": err}), 400
-    records = mongo_db.get_logs_by_date(date_str)
+    records = sorted(mongo_db.get_logs_between(date_from, date_to),
+                     key=lambda r: (r.get("date") or "", r.get("time_in") or ""))
+    label = date_from if date_from == date_to else f"{date_from}_to_{date_to}"
 
     fd, tmp_path = tempfile.mkstemp(suffix=".xlsx")
     os.close(fd)
@@ -354,17 +431,19 @@ def export_excel():
     return send_file(
         tmp_path,
         as_attachment=True,
-        download_name=f"attendance_{date_str}.xlsx",
+        download_name=f"attendance_{label}.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
 
 @app.route("/api/export/csv", methods=["GET"])
 def export_csv():
-    date_str, err = _parse_date_arg(request)
+    date_from, date_to, err = _parse_day_or_range(request)
     if err:
         return jsonify({"error": err}), 400
-    records = mongo_db.get_logs_by_date(date_str)
+    records = sorted(mongo_db.get_logs_between(date_from, date_to),
+                     key=lambda r: (r.get("date") or "", r.get("time_in") or ""))
+    label = date_from if date_from == date_to else f"{date_from}_to_{date_to}"
 
     fd, tmp_path = tempfile.mkstemp(suffix=".csv")
     os.close(fd)
@@ -381,7 +460,7 @@ def export_csv():
     return send_file(
         tmp_path,
         as_attachment=True,
-        download_name=f"attendance_{date_str}.csv",
+        download_name=f"attendance_{label}.csv",
         mimetype="text/csv",
     )
 
@@ -420,12 +499,28 @@ def db_reconnect():
         logger.warning("MongoDB reconnect error: %s", str(exc)[:100])
     connected = mongo_db.is_connected
     if connected:
+        _run_migration()
         socketio.emit("stats:update", _stats_payload())
     audit_event("db.reconnect", details={"connected": connected})
     return jsonify({"ok": connected, "db_connected": connected})
 
 
 _STATS_RANGES = (7, 14, 30)
+
+
+def _parse_stats_range(req):
+    """(from, to, error) for the dashboard: ?from=&to=, or ?days=7|14|30 up to today."""
+    if req.args.get("from") or req.args.get("to"):
+        try:
+            date_from, date_to = parse_range(req.args.get("from"), req.args.get("to"))
+        except RangeError as exc:
+            return None, None, str(exc)
+        return date_from, date_to, None
+    days, err = _parse_days_arg(req)
+    if err:
+        return None, None, err
+    today = datetime.now().date()
+    return (today - timedelta(days=days - 1)).isoformat(), today.isoformat(), None
 
 
 def _parse_days_arg(req):
@@ -444,10 +539,10 @@ def _parse_days_arg(req):
 
 @app.route("/api/stats/weekly", methods=["GET"])
 def stats_weekly():
-    days, err = _parse_days_arg(request)
+    date_from, date_to, err = _parse_stats_range(request)
     if err:
         return jsonify({"error": err}), 400
-    return jsonify(mongo_db.get_weekly_summary(days))
+    return jsonify(mongo_db.get_range_summary(date_from, date_to))
 
 
 @app.route("/api/stats/emotions", methods=["GET"])
@@ -457,10 +552,10 @@ def stats_emotions():
 
 @app.route("/api/stats/persons", methods=["GET"])
 def stats_persons():
-    days, err = _parse_days_arg(request)
+    date_from, date_to, err = _parse_stats_range(request)
     if err:
         return jsonify({"error": err}), 400
-    return jsonify(mongo_db.get_person_summary(days))
+    return jsonify(mongo_db.get_person_summary_range(date_from, date_to))
 
 
 # ── Configuration routes ──────────────────────────────────────────
@@ -516,6 +611,13 @@ def _validate_config(data: dict, current: dict):
         if eff_late >= eff_end:
             return False, "late_after must be earlier than working_hours_end", "late_after"
 
+    # Working days: weekday numbers, Monday = 0
+    working_days = att.get("working_days") if isinstance(att, dict) else None
+    if working_days is not None:
+        if not isinstance(working_days, list) or not working_days or \
+                any(isinstance(d, bool) or not isinstance(d, int) or not 0 <= d <= 6 for d in working_days):
+            return False, "working_days must list at least one weekday, 0 (Monday) to 6 (Sunday)", "working_days"
+
     # Check names
     if "names" in data:
         names_val = data["names"]
@@ -570,6 +672,18 @@ def config_post():
     if not ok:
         return jsonify({"error": err_msg, "field": field}), 400
 
+    # Names belong to the people registry. Change them first: if the
+    # database is offline, nothing at all is saved.
+    names_changed = False
+    if "names" in data:
+        names_before = people.names()
+        try:
+            people.replace_names(data.pop("names"))
+        except PersonError as exc:
+            return jsonify({"error": str(exc), "field": "names"}), exc.status
+        names_changed = people.names() != names_before
+        current = load_config()
+
     old_uri = current.get("mongodb_uri")
     old_db = current.get("mongodb_db")
     old_fb_url = current.get("firebase_url")
@@ -583,6 +697,8 @@ def config_post():
 
     # What changed, for the audit log. Secret values are never recorded.
     changed = sorted(k for k, v in data.items() if k != "attendance" and current.get(k) != v)
+    if names_changed:
+        changed = sorted(changed + ["names"])
     if isinstance(data.get("attendance"), dict):
         changed += sorted("attendance." + k for k, v in data["attendance"].items()
                           if current.get("attendance", {}).get(k) != v)
@@ -598,11 +714,6 @@ def config_post():
     # 1. Update engine config
     engine.update_config(current)
 
-    # 2. Update names on detector and engine
-    new_names = current.get("names", {})
-    detector.update_names(new_names)
-    engine.set_names(build_names(current))
-
     # 3. Check if Mongo settings changed
     warning = None
     new_uri = current.get("mongodb_uri")
@@ -612,6 +723,8 @@ def config_post():
             mongo_db.reconnect(new_uri, new_db)
             if not mongo_db.is_connected:
                 warning = f"MongoDB could not connect to {mask_mongo_uri(new_uri)}"
+            else:
+                _run_migration()
         except Exception as exc:
             warning = f"MongoDB reconnect failed: {str(exc)[:100]}"
             logger.warning("MongoDB reconnect error: %s", warning)
@@ -661,6 +774,7 @@ def collect_start():
         return jsonify({"error": "name is required"}), 400
     if len(name) > 50:
         return jsonify({"error": "name must be 50 characters or fewer"}), 400
+    consent = data.get("consent")
     try:
         max_images = int(max_images)
     except (TypeError, ValueError):
@@ -669,6 +783,16 @@ def collect_start():
         return jsonify({"error": "max_images must be at least 20"}), 400
     if max_images > 2000:
         return jsonify({"error": "max_images must be at most 2000"}), 400
+
+    # Register before the camera starts: needs consent, and an existing ID
+    # must keep its name (this route never renames anyone)
+    try:
+        person, created = people.register(person_id, name, consent)
+    except PersonError as exc:
+        return jsonify({"error": str(exc)}), exc.status
+    name = person["name"]
+    if created:
+        audit_event("person.registered", target=person_id, details={"name": name, "consent_at": person["consent_at"]})
 
     # ── Remember LM state so we can resume after collection + training ────
     was_running = detector.is_running
@@ -705,11 +829,6 @@ def collect_start():
         # collector already fired on_done inside start() on camera error
         return jsonify({"error": err}), 500
 
-    # Register the name in config immediately
-    current = load_config()
-    current.setdefault("names", {})[str(person_id)] = name
-    save_config(current)
-    detector.update_names(current["names"])
     audit_event("collection.started", target=person_id, details={"name": name, "max_images": max_images})
 
     return jsonify({"ok": True, "status": collector.get_status()})
@@ -754,10 +873,7 @@ def train_start():
     if not ok:
         return jsonify({"error": err}), 409
 
-    # Update names from config
-    current = load_config()
-    detector.update_names(current.get("names", {}))
-    engine.set_names(build_names(current))
+    detector.update_names(people.names())
     audit_event("training.started")
 
     return jsonify({"ok": True})
@@ -765,64 +881,35 @@ def train_start():
 
 @app.route("/api/persons", methods=["GET"])
 def persons_list():
-    """List all registered persons from config.names.
-
-    Image count is derived from flat files: ImageData/<pid>_*.jpg
-    """
-    current     = load_config()
-    names       = current.get("names", {})
-    data_folder = current.get("data_folder", "ImageData")
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    data_path   = os.path.join(project_root, data_folder)
-
-    # Pre-count images per person_id from flat files
-    counts = {}
-    if os.path.isdir(data_path):
-        for fname in os.listdir(data_path):
-            if os.path.isdir(os.path.join(data_path, fname)):
-                continue  # skip subfolders
-            if not fname.lower().endswith((".jpg", ".png", ".jpeg")):
-                continue
-            stem = os.path.splitext(fname)[0]
-            if "_" in stem:
-                try:
-                    pid = int(stem.split("_", 1)[0])
-                    counts[pid] = counts.get(pid, 0) + 1
-                except ValueError:
-                    pass
-
-    persons = []
-    for pid_str, name in names.items():
-        pid = int(pid_str)
-        persons.append({
-            "person_id":   pid,
-            "name":        name,
-            "image_count": counts.get(pid, 0),
-        })
-    return jsonify(persons)
+    """Registered people with their image counts (ImageData/<pid>_*.jpg)."""
+    counts = _image_counts()
+    everyone, _ = people.list()
+    return jsonify([
+        {
+            "person_id": p["person_id"],
+            "name": p["name"],
+            "image_count": counts.get(p["person_id"], 0),
+            "consent_at": p.get("consent_at"),
+        }
+        for p in everyone
+    ])
 
 
 @app.route("/api/persons/<int:person_id>", methods=["DELETE"])
 @fresh_required
 def persons_delete(person_id):
-    """Delete a person: remove flat images, remove from config, retrain."""
-    current = load_config()
-    pid_str = str(person_id)
-
-    if pid_str not in current.get("names", {}):
-        return jsonify({"error": "Person not found"}), 404
-
-    # Remove from config
-    removed_name = current["names"].pop(pid_str)
-    save_config(current)
-    audit_event("person.deleted", target=person_id, details={"name": removed_name})
-    detector.update_names(current["names"])
-    engine.set_names(build_names(current))
+    """Delete a person: remove them from the registry, delete their images, retrain.
+    Their attendance records are kept."""
+    try:
+        removed = people.remove(person_id)
+    except PersonError as exc:
+        return jsonify({"error": str(exc)}), exc.status
+    audit_event("person.deleted", target=person_id, details={"name": removed["name"]})
 
     # Remove flat image files for this person
-    data_folder  = current.get("data_folder", "ImageData")
+    current      = load_config()
     project_root = os.path.dirname(os.path.abspath(__file__))
-    data_path    = os.path.join(project_root, data_folder)
+    data_path    = os.path.join(project_root, current.get("data_folder", "ImageData"))
     prefix       = f"{person_id}_"
     if os.path.isdir(data_path):
         for fname in list(os.listdir(data_path)):
@@ -833,8 +920,7 @@ def persons_delete(person_id):
                     pass
 
     # Retrain or reset
-    remaining_names = current.get("names", {})
-    if remaining_names:
+    if people.names():
         trainer.start()
     else:
         # No persons left: delete Trainer.yml and mark recognizer as unready.

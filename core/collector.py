@@ -24,6 +24,25 @@ from core.camera_utils import CAM_BACKEND
 logger = logging.getLogger(__name__)
 
 
+# Guided capture (research A6): the page shows one prompt at a time, so the
+# images cover several angles instead of one frozen pose.
+ANGLE_PROMPTS = (
+    "Look straight at the camera",
+    "Turn your head a little to your left",
+    "Turn your head a little to your right",
+    "Tilt your chin up a little",
+    "Tilt your chin down a little",
+)
+
+
+def prompt_for(collected, target):
+    """The angle prompt for this point of the collection."""
+    if not target or target <= 0:
+        return ANGLE_PROMPTS[0]
+    step = int(collected * len(ANGLE_PROMPTS) / target)
+    return ANGLE_PROMPTS[min(max(step, 0), len(ANGLE_PROMPTS) - 1)]
+
+
 def augment_crop(gray_face):
     """Return a list of augmented grayscale face crops.
 
@@ -223,6 +242,7 @@ class DataCollector:
             "target":       self._max_images,
             "person_name":  self._person_name,
             "person_id":    self._person_id,
+            "prompt":       prompt_for(self._collected, self._max_images) if self.is_active else None,
         }
 
     # ---- internal helpers -------------------------------------------------
@@ -266,7 +286,7 @@ class DataCollector:
                     fx, fy, fw, fh = faces[int(np.argmax(areas))]
 
                     # Draw rectangle
-                    cv2.rectangle(display, (fx, fy), (fx + fw, fy + fh), (168, 85, 247), 2)
+                    cv2.rectangle(display, (fx, fy), (fx + fw, fy + fh), (49, 121, 232), 2)
 
                     # Crop face ROI
                     face_roi = gray[fy:fy + fh, fx:fx + fw]
@@ -286,12 +306,13 @@ class DataCollector:
                             "max_images": self._max_images,
                             "person_id":  self._person_id,
                             "name":       self._person_name,
+                            "prompt":     prompt_for(self._collected, self._max_images),
                         })
 
                 # Progress overlay
                 label = f"Collected: {self._collected}/{self._max_images}"
                 cv2.putText(display, label, (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (168, 85, 247), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (49, 121, 232), 2)
 
                 # Encode to JPEG for preview
                 ret_enc, jpeg = cv2.imencode(

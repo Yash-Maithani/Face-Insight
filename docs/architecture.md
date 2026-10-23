@@ -11,15 +11,20 @@
 | `core/trainer.py` | Trains the recogniser from `ImageData/` and swaps the new model in while the app keeps running. |
 | `core/camera_utils.py` | Picks the camera backend for the operating system. |
 | `attendance/engine.py` | Decides whether a sighting becomes a record: cooldown, Present, Late or Unknown, and manual marks. |
-| `attendance/exporter.py` | Excel and CSV export. |
+| `attendance/exporter.py` | Excel and CSV export of raw records. |
+| `attendance/summary.py` | The daily summary: one status per person per day, first and last seen. |
+| `attendance/reports.py` | Reports for a date range and a set of people, as CSV or PDF (ReportLab), from the same rows. |
+| `people/registry.py` | Registered people. The `persons` collection is the source of truth; `config.json` keeps a copy of the names for offline starts. |
+| `people/migration.py` | The version 2 data migration, run on start and by `tools/migrate_v2.py`. Backs up first, safe to run twice. |
+| `people/web.py` | The People and Reports APIs. |
 | `auth/store.py` | Admin accounts in `instance/users.json`, bcrypt password hashes, and the sign-in throttle. |
 | `auth/audit.py` | The audit log: writes to MongoDB, or to `instance/audit-offline.jsonl` while it is down. |
 | `auth/web.py` | The sign-in gate in front of every route, the sign-in and setup pages, and the account APIs. |
-| `db/mongo_client.py` | A thin wrapper around two collections, `attendance_logs` and `audit_log`. |
+| `db/mongo_client.py` | A thin wrapper around `attendance_logs`, `persons`, `audit_log` and `app_meta` (migration markers). |
 | `db/firebase_client.py` | Optional mirror to Firebase. Does nothing unless it is configured. |
 | `web/templates/index.html` | The app page. `login.html` and `setup.html` are the only others. |
 | `web/static/js/app.js` | Shared code: socket, theme, URL handling, dialogs, toasts, and the Live Monitor tab. |
-| `web/static/js/*.js` | One file each for Attendance, Dashboard, Register, Settings and the Audit log. |
+| `web/static/js/*.js` | One file each for Attendance, People, Dashboard, Reports, Register, Settings and the Audit log. |
 | `web/static/css/style.css` | All the styles. The colour tokens are at the top. |
 
 ## What happens to a frame
@@ -46,6 +51,25 @@ The app is meant to keep running when optional parts are absent:
 - MongoDB unreachable: reads come back empty, writes are refused, and the status routes say so. The page shows a banner and `--` in place of counts, because a zero would be a false statement.
 
 The one thing that stops startup is a missing expression model, and the error names the path it looked in.
+
+## People and the daily summary
+
+People live in the `persons` collection: ID, name, when they agreed to have their face stored (`consent_at`) and when they were registered. `config.json` keeps a copy of the names, rewritten after every change, so faces still get names while the database is down. Adding, renaming or removing someone needs the database.
+
+Collecting face images registers the person. A new ID needs consent. An ID that is already taken keeps its name: the collect route never renames anyone. Renaming happens on the People page and is audited.
+
+Records are stored per sighting and never changed by the summary. The daily summary reads them and gives each person one status per day:
+
+- The first camera sighting decides Present or Late. A manual mark that day overrides it, and the latest manual mark wins.
+- A working day with no record, up to today, is Absent. Today becomes Absent only after the end of the working day; before that it is "Not seen yet".
+- Days before a person was registered, future days and non-working days without records are left out.
+- Unknown faces belong to nobody. Their records have `person_id: null`, and the recogniser's closest guess is kept in `guessed_person_id`.
+
+Reports and the People page both use this summary. A CSV and a PDF of the same report contain the same rows.
+
+## The version 2 migration
+
+On start (and after the database reconnects) the app checks whether there is anything to move: names in `config.json` that the `persons` collection does not have, and Unknown records that still carry a guessed `person_id`. If there is, it writes `attendance_logs` and `persons` to `instance/backups/<time>/` as MongoDB Extended JSON first, then imports the names and moves the guesses to `guessed_person_id`. When there is nothing to do, it writes nothing. `python tools/migrate_v2.py --dry-run` shows what would change; `--restore <folder>` puts a backup back.
 
 ## Signing in
 
@@ -76,26 +100,31 @@ Every route needs a signed-in admin, apart from `/login`, `/setup` and static fi
 | GET | `/api/camera/list` | Camera indexes that returned a real frame at startup |
 | POST | `/api/camera/start` `{cam_index}` | Start the Live Monitor |
 | POST | `/api/camera/stop` | Stop it |
-| GET | `/api/attendance?date=` | Records for a day (today if no date) |
-| POST | `/api/attendance/manual` `{person_id, name, status}` | Add a record by hand |
+| GET | `/api/attendance?date=` or `?from=&to=` | Records for a day (today if no date) or a date range |
+| POST | `/api/attendance/manual` `{person_id, name, status}` | Add a record by hand: a registered person, Present or Late |
 | GET | `/api/attendance/<id>/snapshot` | The face crop for a record |
 | DELETE | `/api/attendance/<id>` | Delete one record, its face crop, and the cooldown it started |
 | DELETE | `/api/attendance?date=<today>` | Delete today's records. The date is required and must be today. |
-| GET | `/api/export/excel`, `/api/export/csv` `?date=` | Download a day |
+| GET | `/api/export/excel`, `/api/export/csv` `?date=` or `?from=&to=` | Download a day or a range |
 | GET | `/api/stats/today` | Today's counts, live camera numbers, and `db_connected` |
-| GET | `/api/stats/weekly?days=7\|14\|30` | Counts per day |
-| GET | `/api/stats/persons?days=7\|14\|30` | Records and distinct days per person |
+| GET | `/api/stats/weekly?days=7\|14\|30` or `?from=&to=` | Counts per day |
+| GET | `/api/stats/persons?days=7\|14\|30` or `?from=&to=` | Records and distinct days per person (Unknown faces left out) |
 | GET | `/api/stats/emotions` | Today's expression counts |
 | GET | `/api/status` | `{db_connected, firebase_enabled}` |
 | POST | `/api/db/reconnect` | Try the database again with the saved settings |
 | GET, POST | `/api/config` | Read and save settings |
 | POST | `/api/config/db_test` `{uri}` | Test a MongoDB address without saving it |
-| POST | `/api/collect/start` `{person_id, name, max_images}` | Start collecting face images |
+| POST | `/api/collect/start` `{person_id, name, max_images, consent}` | Register the person (consent needed once) and start collecting face images |
 | POST | `/api/collect/stop` | Stop early. Images already taken are kept. |
 | GET | `/api/collect/feed` | MJPEG preview during collection |
 | POST | `/api/train` | Train the recogniser |
 | GET | `/api/persons` | Registered people with image counts |
-| DELETE | `/api/persons/<id>` | Remove a person and their images, then retrain |
+| DELETE | `/api/persons/<id>` | Remove a person and their images, then retrain. Their records are kept. |
+| GET | `/api/people` | Everyone registered, with image count, consent and last seen |
+| GET | `/api/people/<id>?from=&to=` | One person's daily summary, totals and records (last 30 days by default) |
+| PATCH | `/api/people/<id>` `{name}` | Rename |
+| GET | `/api/reports?from=&to=&people=` | Report preview. `people` is a comma-separated list of IDs; blank means everyone. |
+| GET | `/api/reports/export.csv`, `/api/reports/export.pdf` | The same report as a file. An empty report is a 404 with a message, never an empty file. |
 
 ## Socket.IO events
 
@@ -121,7 +150,9 @@ The camera buttons work the same way. The page does not trust the HTTP response.
 The open tab and one argument are kept after the `#`:
 
 - `#attendance/2026-10-07` opens the Attendance tab on that date. Today has no argument.
-- `#dashboard/14` opens the Dashboard on a 14 day period. Seven days has no argument.
+- `#attendance/2026-10-01..2026-10-07` opens the Attendance tab on a date range.
+- `#dashboard/14` opens the Dashboard on a 14 day period, `#dashboard/2026-09-01..2026-09-30` on chosen dates. Seven days has no argument.
+- `#people/3` opens the page of person 3.
 
 Anything the app does not recognise falls back to the default, and the URL is corrected.
 

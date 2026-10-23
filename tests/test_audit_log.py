@@ -233,6 +233,8 @@ check("Failed sign-in is recorded with the username tried",
 check("Failed sign-in never stores the password", "wrong-password" not in json.dumps(data))
 
 if mongo_available:
+    from helpers import register_people  # noqa: E402
+    register_people(server, {901: "Audit Person"})
     res = client.post("/api/attendance/manual", json={"person_id": 901, "name": "Audit Person", "status": "Present"})
     record_id = res.get_json()["record"]["id"]
     status, data = audit(action="attendance.manual_mark")

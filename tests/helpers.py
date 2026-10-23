@@ -25,18 +25,27 @@ TEST_MONGO_URI = "mongodb://localhost:27017"
 _cleanup_registered = False
 
 
-def _clear_test_audit():
-    """Remove the audit entries the test sign-ins wrote. Only ever the test database.
+def _clean_test_db():
+    """Remove what sign-ins and registrations wrote: audit entries, people
+    and migration markers. Only ever the test database.
 
     Opens its own connection: the tests close theirs before exiting.
     """
     try:
         from pymongo import MongoClient
         client = MongoClient(TEST_MONGO_URI, serverSelectionTimeoutMS=2000)
-        client[TEST_DB]["audit_log"].delete_many({})
+        for name in ("audit_log", "persons", "app_meta"):
+            client[TEST_DB][name].delete_many({})
         client.close()
     except Exception:
         pass  # MongoDB not running: there is nothing to clean
+
+
+def _register_cleanup():
+    global _cleanup_registered
+    if not _cleanup_registered:
+        atexit.register(_clean_test_db)
+        _cleanup_registered = True
 
 
 def ensure_admin(server, username=TEST_USER, password=TEST_PASSWORD):
@@ -44,12 +53,20 @@ def ensure_admin(server, username=TEST_USER, password=TEST_PASSWORD):
     real_instance = os.path.join(PROJECT_ROOT, "instance")
     if os.path.abspath(server.INSTANCE_DIR) == os.path.abspath(real_instance):
         raise RuntimeError("Tests must run with FACE_WEB_CONFIG set to a temporary config.")
-    global _cleanup_registered
-    if not _cleanup_registered:
-        atexit.register(_clear_test_audit)
-        _cleanup_registered = True
+    _register_cleanup()
     if server.users.find(username) is None:
         server.users.create(username, password)
+
+
+def register_people(server, people):
+    """Register {id: name} with consent, through the app's own registry.
+    Needs the test database. Only ever the test database."""
+    db = server.mongo_db
+    if getattr(db, "_db_name", None) != TEST_DB:
+        raise RuntimeError("register_people only runs against the test database.")
+    _register_cleanup()
+    for pid, name in people.items():
+        server.people.register(int(pid), name, True)
 
 
 def sign_in(client, username=TEST_USER, password=TEST_PASSWORD):

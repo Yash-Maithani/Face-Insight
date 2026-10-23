@@ -2709,6 +2709,246 @@ body.auth-page {
 }
 
 /* --- Reduced Motion ------------------------------------------------------ */
+/* --- Daily statuses: Absent and Not seen yet ------------------------------ */
+.shape--absent {
+    color: var(--danger);
+    background: transparent;
+    border: 2px solid currentColor;
+}
+
+.status-badge--absent {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.status-badge--absent::before {
+    background: transparent;
+    border: 1.5px solid currentColor;
+}
+
+.status-badge--pending {
+    background: var(--surface-2);
+    color: var(--text-dim);
+}
+
+.status-badge--pending::before {
+    background: transparent;
+    border: 1.5px solid currentColor;
+    border-radius: 50%;
+}
+
+/* --- Date ranges ---------------------------------------------------------- */
+.date-nav {
+    flex-wrap: wrap;
+}
+
+.date-nav__label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.range-custom {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.range-custom .field-error {
+    flex-basis: 100%;
+}
+
+.table-note {
+    padding: 10px 16px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+/* --- Check chips (working days, report people) ---------------------------- */
+.check-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.check-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.check-chip:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.check-chip input {
+    accent-color: var(--accent);
+}
+
+fieldset.working-days,
+fieldset.report-people {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
+fieldset.working-days legend,
+fieldset.report-people legend {
+    margin-bottom: 8px;
+    padding: 0;
+}
+
+/* --- Register: consent and angle prompts ---------------------------------- */
+.consent__label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    cursor: pointer;
+}
+
+.consent__label input {
+    margin-top: 3px;
+    accent-color: var(--accent);
+}
+
+.collect-prompt {
+    margin: 12px 20px 0;
+    padding: 10px 14px;
+    border-left: 3px solid var(--accent);
+    background: var(--surface-2);
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+/* --- People ----------------------------------------------------------------- */
+.people-search {
+    min-width: 260px;
+}
+
+.people-table tbody tr {
+    cursor: pointer;
+}
+
+.person-card {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 16px 32px;
+    margin-bottom: 20px;
+    padding: 16px 20px;
+}
+
+.person-card__name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.person-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+.person-card__meta dt {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+}
+
+.person-card__meta dd {
+    margin: 0;
+}
+
+.person-rename {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 260px;
+}
+
+.person-rename__row {
+    display: flex;
+    gap: 8px;
+}
+
+.person-rename__row .form-input {
+    flex: 1;
+}
+
+#personDaysTable tr.day-row {
+    cursor: pointer;
+}
+
+.day-records td {
+    background: var(--surface-2);
+}
+
+.day-records__list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 4px 0;
+    list-style: none;
+    font-size: 0.8rem;
+}
+
+.day-records__list li {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* --- Reports ---------------------------------------------------------------- */
+.report-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 20px;
+    padding: 16px 20px;
+}
+
+.report-form__row {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.report-form__actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+#panel-reports .table-card + .table-card {
+    margin-top: 20px;
+}
+
+@media (max-width: 640px) {
+    .people-search,
+    .person-rename {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .report-form__actions {
+        margin-left: 0;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation: none !important;

@@ -8,40 +8,45 @@
     "use strict";
 
     // ── State ────────────────────────────────────────────────────────────
-    let selectedDate = initialDate();
+    // The shown period: one day when from === to, otherwise a date range.
+    const MAX_RANGE_DAYS = 366;
+    const today = () => App.dates.today();
+    let range = initialRange();
     let records = [];
     let currentFilter = "All"; // "All" | "Present" | "Late" | "Unknown"
     let currentSort = "time_desc"; // "time_desc" | "time_asc" | "name_asc" | "status_prio"
     let sortCol = null;
     let sortAsc = true;
 
-    function getTodayStr() {
-        const d = new Date();
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${year}-${month}-${day}`;
+    const isRange = () => range.from !== range.to;
+    const rangeKey = (r) => `${r.from}..${r.to}`;
+    const inRange = (date) => date >= range.from && date <= range.to;
+    const periodText = () => (isRange() ? "in this date range" : "for this date");
+
+    // From the URL: #attendance/2026-10-07 for a day, #attendance/2026-10-01..2026-10-07 for a range
+    function rangeFromArg(arg) {
+        if (App.dates.isPast(arg)) return { from: arg, to: arg };
+        return App.dates.parseRange(arg, MAX_RANGE_DAYS) || { from: today(), to: today() };
     }
 
-    // A real YYYY-MM-DD date that is not in the future
-    function isSelectableDate(str) {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(str || "")) return false;
-        const d = new Date(str + "T00:00:00");
-        return !isNaN(d.getTime()) && formatDate(d) === str && str <= getTodayStr();
-    }
-
-    // The date can come from the URL: #attendance/2026-10-07
-    function initialDate() {
+    function initialRange() {
         const route = App.route.get();
-        return route.tab === "attendance" && isSelectableDate(route.arg) ? route.arg : getTodayStr();
+        return rangeFromArg(route.tab === "attendance" ? route.arg : "");
+    }
+
+    function routeArg() {
+        if (isRange()) return rangeKey(range);
+        return range.from === today() ? "" : range.from;
     }
 
     function syncRoute() {
-        App.route.setArg("attendance", selectedDate === getTodayStr() ? "" : selectedDate);
+        App.route.setArg("attendance", routeArg());
     }
 
     // ── DOM Elements ─────────────────────────────────────────────────────
     const datePicker = document.getElementById("attendanceDatePicker");
+    const dateTo = document.getElementById("attendanceDateTo");
+    const dateCol = document.getElementById("attendanceDateCol");
     const btnDatePrev = document.getElementById("btnDatePrev");
     const btnDateNext = document.getElementById("btnDateNext");
     const btnDateToday = document.getElementById("btnDateToday");
@@ -83,88 +88,101 @@
     const btnExportCsv = document.getElementById("btnExportCsv");
 
     // ── Date Navigation ──────────────────────────────────────────────────
-    function selectDate(dateStr) {
-        selectedDate = dateStr;
-        datePicker.value = selectedDate;
+    function setRange(from, to) {
+        range = { from, to };
+        datePicker.value = from;
+        dateTo.value = to;
         updateDateButtonStates();
         syncRoute();
         fetchRecords();
     }
 
-    function shiftDate(days) {
-        const d = new Date(selectedDate + "T00:00:00");
-        d.setDate(d.getDate() + days);
-        const next = formatDate(d);
-        if (next <= getTodayStr()) selectDate(next);
+    // Previous and next move by the length of the period shown
+    function shiftRange(direction) {
+        const n = App.dates.span(range.from, range.to) * direction;
+        const to = App.dates.addDays(range.to, n);
+        if (to > today()) return;
+        setRange(App.dates.addDays(range.from, n), to);
     }
 
     function initDateControls() {
-        datePicker.value = selectedDate;
-        datePicker.max = getTodayStr();
+        datePicker.value = range.from;
+        dateTo.value = range.to;
+        datePicker.max = today();
+        dateTo.max = today();
         updateDateButtonStates();
 
         datePicker.addEventListener("change", () => {
-            if (!isSelectableDate(datePicker.value)) {
-                // Cleared or future date: fall back to the nearest valid choice
-                datePicker.value = datePicker.value > getTodayStr() ? getTodayStr() : selectedDate;
-            }
-            selectDate(datePicker.value);
+            let from = datePicker.value;
+            if (!App.dates.isPast(from)) from = from > today() ? today() : range.from;
+            // Moving the start past the end makes it a single day
+            let to = range.to < from ? from : range.to;
+            if (App.dates.span(from, to) > MAX_RANGE_DAYS) to = App.dates.addDays(from, MAX_RANGE_DAYS - 1);
+            setRange(from, to);
         });
 
-        btnDatePrev.addEventListener("click", () => shiftDate(-1));
-        btnDateNext.addEventListener("click", () => shiftDate(1));
-        btnDateToday.addEventListener("click", () => selectDate(getTodayStr()));
-    }
+        dateTo.addEventListener("change", () => {
+            let to = dateTo.value;
+            if (!App.dates.isPast(to)) to = to > today() ? today() : range.to;
+            let from = range.from > to ? to : range.from;
+            if (App.dates.span(from, to) > MAX_RANGE_DAYS) from = App.dates.addDays(to, -(MAX_RANGE_DAYS - 1));
+            setRange(from, to);
+        });
 
-    function formatDate(d) {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${year}-${month}-${day}`;
+        btnDatePrev.addEventListener("click", () => shiftRange(-1));
+        btnDateNext.addEventListener("click", () => shiftRange(1));
+        btnDateToday.addEventListener("click", () => setRange(today(), today()));
     }
 
     function updateDateButtonStates() {
-        const today = getTodayStr();
-        btnDateNext.disabled = (selectedDate >= today);
+        btnDateNext.disabled = range.to >= today();
+        datePicker.max = today();
+        dateTo.max = today();
     }
 
     // ── Fetch Records ────────────────────────────────────────────────────
-    // loadedDate is the date the current `records` belong to. Changing the
-    // date clears the table first, so one day's rows are never shown under
-    // another day's date while the request is in flight.
+    // loadedKey is the period the current `records` belong to. Changing the
+    // period clears the table first, so one period's rows are never shown
+    // under another's dates while the request is in flight.
     let isLoading = false;
     let loadError = false;
-    let loadedDate = null;
+    let loadedKey = null;
+
+    function periodQuery() {
+        return isRange()
+            ? `from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
+            : `date=${encodeURIComponent(range.from)}`;
+    }
 
     function fetchRecords() {
-        const requestedDate = selectedDate;
+        const requestedKey = rangeKey(range);
         loadError = false;
-        if (loadedDate !== requestedDate) {
+        if (loadedKey !== requestedKey) {
             records = [];
             isLoading = true;
             updateCountsAndKpis();
             renderTable();
         }
 
-        fetch(`/api/attendance?date=${encodeURIComponent(requestedDate)}`)
+        fetch(`/api/attendance?${periodQuery()}`)
             .then((r) => {
                 if (!r.ok) throw new Error("Failed to load records");
                 return r.json();
             })
             .then((data) => {
-                // The user moved to another date before this answer arrived
-                if (requestedDate !== selectedDate) return;
+                // The user moved to another period before this answer arrived
+                if (requestedKey !== rangeKey(range)) return;
                 records = Array.isArray(data) ? data : [];
-                loadedDate = requestedDate;
+                loadedKey = requestedKey;
                 isLoading = false;
                 updateCountsAndKpis();
                 renderTable();
                 openPendingRecord();
             })
             .catch(() => {
-                if (requestedDate !== selectedDate) return;
+                if (requestedKey !== rangeKey(range)) return;
                 records = [];
-                loadedDate = null;
+                loadedKey = null;
                 isLoading = false;
                 loadError = true;
                 updateCountsAndKpis();
@@ -297,10 +315,11 @@
         }
 
         const sorted = [...filtered];
+        const when = (r) => `${r.date || ""} ${r.time_in || ""}`;
         if (currentSort === "time_desc") {
-            sorted.sort((a, b) => (b.time_in || "").localeCompare(a.time_in || ""));
+            sorted.sort((a, b) => when(b).localeCompare(when(a)));
         } else if (currentSort === "time_asc") {
-            sorted.sort((a, b) => (a.time_in || "").localeCompare(b.time_in || ""));
+            sorted.sort((a, b) => when(a).localeCompare(when(b)));
         } else if (currentSort === "name_asc") {
             sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
         } else if (currentSort === "status_prio") {
@@ -374,7 +393,8 @@
             : match.label;
         const manualText = rec.manual ? '<span class="manual-tag">Yes</span>' : '<span class="manual-tag">No</span>';
 
-        tr.innerHTML = `
+        const dateCell = isRange() ? `<td data-label="Date" class="mono">${App.escapeHtml(rec.date || "--")}</td>` : "";
+        tr.innerHTML = `${dateCell}
             <td data-label="Name"><strong>${App.escapeHtml(rec.name || "Unknown")}</strong></td>
             <td data-label="ID" class="col-num"><code>${personIdText(rec)}</code></td>
             <td data-label="Time in" class="mono">${App.escapeHtml(rec.time_in || "--")}</td>
@@ -391,18 +411,19 @@
     function renderTable() {
         const displayRecords = getFilteredAndSortedRecords();
         tableBody.innerHTML = "";
+        dateCol.hidden = !isRange();
 
         if (displayRecords.length === 0) {
             if (isLoading) {
                 App.renderState(tableEmpty, "loading", "Loading records...");
             } else if (loadError) {
-                App.renderState(tableEmpty, "error", "Could not load records for this date.", fetchRecords);
+                App.renderState(tableEmpty, "error", `Could not load records ${periodText()}.`, fetchRecords);
             } else if (App.db.isConnected() === false) {
-                App.renderState(tableEmpty, "error", "Database offline. Records for this date cannot be loaded.", fetchRecords);
+                App.renderState(tableEmpty, "error", `Database offline. Records ${periodText()} cannot be loaded.`, fetchRecords);
             } else if (currentFilter !== "All" && records.length > 0) {
-                App.renderState(tableEmpty, "empty", `No ${currentFilter} records for this date.`);
+                App.renderState(tableEmpty, "empty", `No ${currentFilter} records ${periodText()}.`);
             } else {
-                App.renderState(tableEmpty, "empty", "No attendance records for this date.");
+                App.renderState(tableEmpty, "empty", `No attendance records ${periodText()}.`);
             }
             tableEmpty.style.display = "block";
             table.style.display = "none";
@@ -688,8 +709,8 @@
                 App.showToast(`${person.name} marked ${statusVal}`, "success");
                 closeManualModal();
 
-                // If currently viewing today, update local records
-                if (selectedDate === getTodayStr() && data.record) {
+                // If the shown period includes today, add it to the table
+                if (inRange(today()) && data.record) {
                     const exists = records.some((r) => r.id === data.record.id);
                     if (!exists) {
                         records.unshift(data.record);
@@ -708,8 +729,9 @@
 
     // ── Export Actions ───────────────────────────────────────────────────
     function startExport(format, label) {
-        App.showToast(`Downloading ${label} for ${selectedDate} (${records.length} records)`, "info");
-        App.download(`/api/export/${format}?date=${encodeURIComponent(selectedDate)}`);
+        const period = isRange() ? `${range.from} to ${range.to}` : range.from;
+        App.showToast(`Downloading ${label} for ${period} (${records.length} records)`, "info");
+        App.download(`/api/export/${format}?${periodQuery()}`);
     }
 
     btnExportExcel.addEventListener("click", () => startExport("excel", "Excel file"));
@@ -719,7 +741,7 @@
         const nothing = records.length === 0;
         [btnExportExcel, btnExportCsv].forEach((btn) => {
             btn.disabled = nothing;
-            btn.title = nothing ? "No records to export for this date" : "";
+            btn.title = nothing ? `No records to export ${periodText()}` : "";
         });
     }
 
@@ -736,7 +758,7 @@
 
     // ── Live WebSocket Updates ───────────────────────────────────────────
     App.socket.on("attendance:new", (record) => {
-        if (selectedDate === getTodayStr() && record && record.id) {
+        if (record && record.id && inRange(record.date || today())) {
             const exists = records.some((r) => r.id === record.id);
             if (!exists) {
                 records.unshift(record);
@@ -755,7 +777,7 @@
     // ── Cross-Navigation Support (tab:navigate) ──────────────────────────
     window.addEventListener("tab:navigate", (e) => {
         if (e.detail && e.detail.tab === "attendance") {
-            // A tab click wrote "#attendance": put the selected date back.
+            // A tab click wrote "#attendance": put the shown period back.
             // When the URL itself caused the switch, route:change handles it.
             if (!e.detail.opts || !e.detail.opts.fromRoute) syncRoute();
             if (e.detail.opts && e.detail.opts.filter) {
@@ -765,8 +787,8 @@
                 // Feed items are always today's records
                 pendingRecordId = e.detail.opts.recordId;
                 if (currentFilter !== "All") setFilter("All");
-                if (selectedDate !== getTodayStr()) {
-                    selectDate(getTodayStr());
+                if (range.from !== today() || range.to !== today()) {
+                    setRange(today(), today());
                 } else if (records.some((r) => r.id === pendingRecordId)) {
                     openPendingRecord();
                 } else {
@@ -776,17 +798,18 @@
         }
     });
 
-    // Back/forward or a hand-edited URL changed the date
+    // Back/forward or a hand-edited URL changed the period
     window.addEventListener("route:change", (e) => {
         if (e.detail.tab !== "attendance") return;
-        const wanted = isSelectableDate(e.detail.arg) ? e.detail.arg : getTodayStr();
-        if (wanted !== selectedDate) {
-            selectedDate = wanted;
-            datePicker.value = selectedDate;
+        const wanted = rangeFromArg(e.detail.arg);
+        if (rangeKey(wanted) !== rangeKey(range)) {
+            range = wanted;
+            datePicker.value = range.from;
+            dateTo.value = range.to;
             updateDateButtonStates();
             fetchRecords();
         }
-        // Rewrites an invalid or future date in the URL to what is shown
+        // Rewrites an invalid or future period in the URL to what is shown
         syncRoute();
     });
 

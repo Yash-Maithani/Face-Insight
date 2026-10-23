@@ -53,45 +53,102 @@
         });
     }
 
-    // ── Period (7, 14 or 30 days) ────────────────────────────────────────
-    // Kept in the URL as #dashboard/14 so a reload shows the same view.
+    // ── Period: last 7, 14 or 30 days, or a custom range ─────────────────
+    // Kept in the URL: #dashboard/14, or #dashboard/2026-10-01..2026-10-20.
     const RANGES = [7, 14, 30];
+    const MAX_CUSTOM_DAYS = 366;
     const rangeButtons = document.querySelectorAll("#rangeSwitch [data-range]");
     const kpiRangeLabel = document.getElementById("kpiRangeLabel");
     const chartWeeklyTitle = document.getElementById("chartWeeklyTitle");
     const chartPersonsTitle = document.getElementById("chartPersonsTitle");
+    const customBox = document.getElementById("dashboardCustom");
+    const customFrom = document.getElementById("dashboardFrom");
+    const customTo = document.getElementById("dashboardTo");
+    const errCustom = document.getElementById("errDashboardRange");
 
-    function rangeFromRoute(route) {
+    // { days: 7 } or { from, to }
+    function periodFromRoute(route) {
+        if (route.tab !== "dashboard") return { days: 7 };
         const n = parseInt(route.arg, 10);
-        return route.tab === "dashboard" && RANGES.includes(n) ? n : 7;
+        if (String(n) === route.arg && RANGES.includes(n)) return { days: n };
+        return App.dates.parseRange(route.arg, MAX_CUSTOM_DAYS) || { days: 7 };
     }
 
-    let rangeDays = rangeFromRoute(App.route.get());
+    let period = periodFromRoute(App.route.get());
+
+    const periodKey = (p) => (p.days ? String(p.days) : `${p.from}..${p.to}`);
+    const periodDays = () => (period.days ? period.days : App.dates.span(period.from, period.to));
+    const periodText = () => (period.days ? `last ${period.days} days` : `${period.from} to ${period.to}`);
+    const periodQuery = () =>
+        period.days ? `days=${period.days}` : `from=${encodeURIComponent(period.from)}&to=${encodeURIComponent(period.to)}`;
 
     function syncRoute() {
-        App.route.setArg("dashboard", rangeDays === 7 ? "" : String(rangeDays));
+        App.route.setArg("dashboard", period.days === 7 ? "" : periodKey(period));
     }
 
     function renderRange() {
+        const custom = !period.days;
         rangeButtons.forEach((btn) => {
-            btn.setAttribute("aria-pressed", String(Number(btn.dataset.range) === rangeDays));
+            const pressed = btn.dataset.range === "custom" ? custom : Number(btn.dataset.range) === period.days;
+            btn.setAttribute("aria-pressed", String(pressed));
         });
-        kpiRangeLabel.textContent = `Records, last ${rangeDays} days`;
-        chartWeeklyTitle.textContent = `Attendance Trend, last ${rangeDays} days`;
-        chartPersonsTitle.textContent = `Days Attended, last ${rangeDays} days`;
+        customBox.hidden = !custom;
+        if (custom) {
+            customFrom.value = period.from;
+            customTo.value = period.to;
+        }
+        customFrom.max = App.dates.today();
+        customTo.max = App.dates.today();
+        errCustom.textContent = "";
+        kpiRangeLabel.textContent = `Records, ${periodText()}`;
+        chartWeeklyTitle.textContent = `Attendance Trend, ${periodText()}`;
+        chartPersonsTitle.textContent = `Days Attended, ${periodText()}`;
     }
 
-    function setRange(days) {
-        if (days === rangeDays) return;
-        rangeDays = days;
+    function setPeriod(next) {
+        if (periodKey(next) === periodKey(period)) return;
+        period = next;
         renderRange();
         syncRoute();
         refreshDashboard();
     }
 
     rangeButtons.forEach((btn) => {
-        btn.addEventListener("click", () => setRange(Number(btn.dataset.range)));
+        btn.addEventListener("click", () => {
+            if (btn.dataset.range !== "custom") {
+                setPeriod({ days: Number(btn.dataset.range) });
+                return;
+            }
+            if (period.days) {
+                // Start from the period that was showing
+                const today = App.dates.today();
+                setPeriod({ from: App.dates.addDays(today, -(period.days - 1)), to: today });
+            }
+            customFrom.focus();
+        });
     });
+
+    function applyCustom() {
+        const from = customFrom.value;
+        const to = customTo.value;
+        if (!App.dates.isPast(from) || !App.dates.isPast(to)) {
+            errCustom.textContent = "Pick two dates, neither after today.";
+            return;
+        }
+        if (from > to) {
+            errCustom.textContent = "The start date must be on or before the end date.";
+            return;
+        }
+        if (App.dates.span(from, to) > MAX_CUSTOM_DAYS) {
+            errCustom.textContent = `A period can be at most ${MAX_CUSTOM_DAYS} days.`;
+            return;
+        }
+        errCustom.textContent = "";
+        setPeriod({ from, to });
+    }
+
+    customFrom.addEventListener("change", applyCustom);
+    customTo.addEventListener("change", applyCustom);
 
     renderRange();
 
@@ -123,9 +180,9 @@
         loadFailed = false;
 
         Promise.all([
-            getJson(`/api/stats/weekly?days=${rangeDays}`, []),
+            getJson(`/api/stats/weekly?${periodQuery()}`, []),
             getJson("/api/stats/emotions", {}),
-            getJson(`/api/stats/persons?days=${rangeDays}`, []),
+            getJson(`/api/stats/persons?${periodQuery()}`, []),
             getJson("/api/stats/today", {}),
         ])
             .then(([weekly, emotions, persons, todayStats]) => {
@@ -228,7 +285,7 @@
         );
 
         if (!hasData) {
-            showEmpty(canvasWeekly, emptyWeekly, `No attendance records in the last ${rangeDays} days`);
+            showEmpty(canvasWeekly, emptyWeekly, `No attendance records, ${periodText()}`);
             return;
         }
 
@@ -367,7 +424,7 @@
             .slice(0, 10);
 
         if (people.length === 0) {
-            showEmpty(canvasPersons, emptyPersons, `No registered person was recorded in the last ${rangeDays} days`);
+            showEmpty(canvasPersons, emptyPersons, `No registered person was recorded, ${periodText()}`);
             return;
         }
 
@@ -397,7 +454,7 @@
                 scales: {
                     x: {
                         beginAtZero: true,
-                        max: rangeDays,
+                        max: periodDays(),
                         ticks: { stepSize: 1, precision: 0 },
                         grid: { color: cssVar("--border") },
                     },
@@ -436,9 +493,9 @@
     // Back/forward or a hand-edited URL changed the period
     window.addEventListener("route:change", (e) => {
         if (e.detail.tab !== "dashboard") return;
-        const wanted = rangeFromRoute(e.detail);
-        if (wanted !== rangeDays) {
-            rangeDays = wanted;
+        const wanted = periodFromRoute(e.detail);
+        if (periodKey(wanted) !== periodKey(period)) {
+            period = wanted;
             renderRange();
             refreshDashboard();
         }

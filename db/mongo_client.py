@@ -1,6 +1,7 @@
 """
 db/mongo_client.py
-Thin wrapper around a single ``attendance_logs`` MongoDB collection.
+Thin wrapper around the app's MongoDB collections: ``attendance_logs``,
+``persons``, ``audit_log`` and ``app_meta`` (migration markers).
 
 Design rules:
 - Short server-selection timeout so an unreachable Mongo fails fast.
@@ -10,13 +11,20 @@ Design rules:
 import logging
 from datetime import datetime, timedelta
 
-from pymongo import MongoClient, ASCENDING, DESCENDING
-from pymongo.errors import PyMongoError
+from pymongo import MongoClient, ASCENDING, DESCENDING, ReturnDocument
+from pymongo.errors import DuplicateKeyError, PyMongoError
 
 logger = logging.getLogger(__name__)
 
 # How long pymongo waits for a usable server before giving up (ms).
 _SERVER_SELECTION_TIMEOUT_MS = 3000
+
+
+def _date_list(date_from: str, date_to: str) -> list[str]:
+    """Every YYYY-MM-DD date from one to the other, inclusive."""
+    start = datetime.strptime(date_from, "%Y-%m-%d").date()
+    end = datetime.strptime(date_to, "%Y-%m-%d").date()
+    return [(start + timedelta(days=i)).isoformat() for i in range((end - start).days + 1)]
 
 
 def mask_mongo_uri(uri: str) -> str:
@@ -53,6 +61,7 @@ class MongoAttendanceDB:
             # Index on `date` for fast queries.
             self._collection.create_index([("date", ASCENDING)])
             db["audit_log"].create_index([("ts", DESCENDING)])
+            db["persons"].create_index([("person_id", ASCENDING)], unique=True)
             self._connected = True
             logger.info("MongoDB connected: %s / %s", mask_mongo_uri(self._uri), self._db_name)
         except PyMongoError as exc:
@@ -81,6 +90,10 @@ class MongoAttendanceDB:
         self._client = None
         self._collection = None
         self._connected = False
+
+    def database(self):
+        """The pymongo Database, or None while unreachable. For migrations and backups."""
+        return self._client[self._db_name] if self._connected else None
 
     def insert_log(self, record: dict) -> dict | None:
         """Insert an attendance record.  Returns the record with a string ``id``
@@ -204,6 +217,85 @@ class MongoAttendanceDB:
             self._connected = False
             return None
 
+    # ── persons ───────────────────────────────────────────────────────────
+
+    def list_persons(self) -> list[dict] | None:
+        """Every registered person, by ID. None if unreachable."""
+        if not self._connected:
+            return None
+        try:
+            return list(self._client[self._db_name]["persons"].find({}, {"_id": 0}).sort("person_id", ASCENDING))
+        except PyMongoError as exc:
+            logger.error("list_persons failed: %s", exc)
+            self._connected = False
+            return None
+
+    def insert_person(self, person: dict) -> bool:
+        """Add a person. False if unreachable or the ID is taken."""
+        if not self._connected:
+            return False
+        try:
+            self._client[self._db_name]["persons"].insert_one(dict(person))
+            return True
+        except DuplicateKeyError:
+            return False
+        except PyMongoError as exc:
+            logger.error("insert_person failed: %s", exc)
+            self._connected = False
+            return False
+
+    def update_person(self, person_id: int, fields: dict) -> dict | None:
+        """Change fields on a person. The updated person, or None if missing or unreachable."""
+        if not self._connected:
+            return None
+        try:
+            return self._client[self._db_name]["persons"].find_one_and_update(
+                {"person_id": person_id}, {"$set": fields},
+                projection={"_id": 0}, return_document=ReturnDocument.AFTER,
+            )
+        except PyMongoError as exc:
+            logger.error("update_person failed: %s", exc)
+            self._connected = False
+            return None
+
+    def delete_person(self, person_id: int) -> bool | None:
+        """True if deleted, False if there was no such person, None if unreachable."""
+        if not self._connected:
+            return None
+        try:
+            result = self._client[self._db_name]["persons"].delete_one({"person_id": person_id})
+            return result.deleted_count == 1
+        except PyMongoError as exc:
+            logger.error("delete_person failed: %s", exc)
+            self._connected = False
+            return None
+
+    # ── migration markers ─────────────────────────────────────────────────
+
+    def get_meta(self, key: str):
+        """A stored marker value, or None (also while unreachable)."""
+        if not self._connected:
+            return None
+        try:
+            doc = self._client[self._db_name]["app_meta"].find_one({"_id": key})
+            return doc.get("value") if doc else None
+        except PyMongoError as exc:
+            logger.error("get_meta failed: %s", exc)
+            self._connected = False
+            return None
+
+    def set_meta(self, key: str, value) -> bool:
+        if not self._connected:
+            return False
+        try:
+            self._client[self._db_name]["app_meta"].update_one(
+                {"_id": key}, {"$set": {"value": value}}, upsert=True)
+            return True
+        except PyMongoError as exc:
+            logger.error("set_meta failed: %s", exc)
+            self._connected = False
+            return False
+
     # ── reads ─────────────────────────────────────────────────────────────
 
     def _safe_find(self, query: dict) -> list[dict]:
@@ -226,17 +318,62 @@ class MongoAttendanceDB:
         """All records for a given ``YYYY-MM-DD`` string."""
         return self._safe_find({"date": date_str})
 
+    def get_logs_between(self, date_from: str, date_to: str) -> list[dict]:
+        """All records from ``date_from`` to ``date_to`` (YYYY-MM-DD, inclusive)."""
+        return self._safe_find({"date": {"$gte": date_from, "$lte": date_to}})
+
+    def find_logs(self, date_from: str, date_to: str, person_ids=None) -> list[dict] | None:
+        """Records in a date range, optionally for some people only, oldest
+        first. None if unreachable, so a report never mistakes an outage for
+        an empty range."""
+        if not self._connected:
+            return None
+        query = {"date": {"$gte": date_from, "$lte": date_to}}
+        if person_ids is not None:
+            query["person_id"] = {"$in": list(person_ids)}
+        try:
+            docs = list(self._collection.find(query).sort([("date", ASCENDING), ("time_in", ASCENDING)]))
+            for d in docs:
+                d["id"] = str(d.pop("_id"))
+                if "created_at" in d and hasattr(d["created_at"], "isoformat"):
+                    d["created_at"] = d["created_at"].isoformat()
+            return docs
+        except PyMongoError as exc:
+            logger.error("find_logs failed: %s", exc)
+            self._connected = False
+            return None
+
+    def last_seen_by_person(self) -> dict:
+        """{person_id: "YYYY-MM-DD HH:MM:SS"} of each person's latest record. {} if unreachable."""
+        if not self._connected:
+            return {}
+        try:
+            pipeline = [
+                {"$match": {"status": {"$ne": "Unknown"}, "person_id": {"$ne": None}}},
+                {"$group": {"_id": "$person_id",
+                            "last": {"$max": {"$concat": ["$date", " ", {"$ifNull": ["$time_in", ""]}]}}}},
+            ]
+            return {doc["_id"]: doc["last"].strip() for doc in self._collection.aggregate(pipeline)}
+        except PyMongoError as exc:
+            logger.error("last_seen_by_person failed: %s", exc)
+            self._connected = False
+            return {}
+
     def get_today_logs(self) -> list[dict]:
         today = datetime.now().strftime("%Y-%m-%d")
         return self._safe_find({"date": today})
 
     def get_weekly_summary(self, days: int = 7) -> list[dict]:
-        """Return a list of *days* dicts (last *days* days, oldest first) with keys:
+        """The last *days* days up to today. See ``get_range_summary``."""
+        today = datetime.now().date()
+        return self.get_range_summary((today - timedelta(days=days - 1)).isoformat(), today.isoformat())
+
+    def get_range_summary(self, date_from: str, date_to: str) -> list[dict]:
+        """One dict per day from ``date_from`` to ``date_to``, oldest first, with
         ``date``, ``present_count``, ``late_count``, ``unknown_count``.
         Days with no records still appear with zero counts.
         """
-        today = datetime.now().date()
-        dates = [(today - timedelta(days=i)).isoformat() for i in range(days - 1, -1, -1)]
+        dates = _date_list(date_from, date_to)
 
         # Pre-fill with zeros
         summary = {d: {"date": d, "present_count": 0, "late_count": 0, "unknown_count": 0} for d in dates}
@@ -264,7 +401,7 @@ class MongoAttendanceDB:
                         summary[d]["unknown_count"] = doc["count"]
             return list(summary.values())
         except PyMongoError as exc:
-            logger.error("get_weekly_summary failed: %s", exc)
+            logger.error("get_range_summary failed: %s", exc)
             self._connected = False
             return list(summary.values())
 
@@ -298,19 +435,22 @@ class MongoAttendanceDB:
             return {}
 
     def get_person_summary(self, days: int = 7) -> list[dict]:
-        """Return per-person attendance for the last *days* days as:
-        [{person_id, name, count, days}].
+        """The last *days* days up to today. See ``get_person_summary_range``."""
+        today = datetime.now().date()
+        return self.get_person_summary_range((today - timedelta(days=days - 1)).isoformat(), today.isoformat())
+
+    def get_person_summary_range(self, date_from: str, date_to: str) -> list[dict]:
+        """Per-person attendance from ``date_from`` to ``date_to`` as
+        [{person_id, name, count, days}]. Unknown faces are left out.
 
         ``count`` is the number of records; ``days`` is the number of distinct
         dates the person has at least one record on.
         """
         if not self._connected:
             return []
-        today = datetime.now().date()
-        dates = [(today - timedelta(days=i)).isoformat() for i in range(days - 1, -1, -1)]
         try:
             pipeline = [
-                {"$match": {"date": {"$in": dates}}},
+                {"$match": {"date": {"$gte": date_from, "$lte": date_to}, "status": {"$ne": "Unknown"}}},
                 {"$group": {
                     "_id": {"person_id": "$person_id", "name": "$name"},
                     "count": {"$sum": 1},

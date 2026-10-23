@@ -90,6 +90,10 @@ section("1. Seed records (Present, Late, Unknown) & Verify Listing / Counts")
 today = datetime.now().strftime("%Y-%m-%d")
 yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
+# Manual marks are for registered people only
+from helpers import register_people  # noqa: E402
+register_people(server, {101: "Alice Cooper", 102: "Bob Marley"})
+
 # Manual Mark: Present
 r_pres = client.post("/api/attendance/manual", json={"person_id": 101, "name": "Alice Cooper", "status": "Present"})
 check("Manual mark Present status 200", r_pres.status_code == 200)
@@ -98,9 +102,9 @@ check("Manual mark Present status 200", r_pres.status_code == 200)
 r_late = client.post("/api/attendance/manual", json={"person_id": 102, "name": "Bob Marley", "status": "Late"})
 check("Manual mark Late status 200", r_late.status_code == 200)
 
-# Manual Mark: Unknown
-r_unk = client.post("/api/attendance/manual", json={"person_id": -1, "name": "Unknown Person", "status": "Unknown"})
-check("Manual mark Unknown status 200", r_unk.status_code == 200)
+# Unknown face seen by the camera (manual marks cannot be Unknown)
+r_unk = server.engine.process_detection(-1, False, "", 0.0)
+check("Unknown face recorded", r_unk is not None)
 
 # Detection with face_crop: Present
 fake_crop = np.zeros((100, 100), dtype=np.uint8)
@@ -211,7 +215,7 @@ section("5. Manual Mark Validation (Invalid Status & Bad Inputs)")
 # Invalid status
 r_bad_stat = client.post("/api/attendance/manual", json={"person_id": 1, "name": "Bob", "status": "InvalidStatus"})
 check("Invalid status returns 400", r_bad_stat.status_code == 400)
-check("Error message indicates status issue", "Status must be Present, Late, or Unknown" in r_bad_stat.get_json().get("error", ""))
+check("Error message indicates status issue", "Status must be Present or Late" in r_bad_stat.get_json().get("error", ""))
 
 # Missing name
 r_no_name = client.post("/api/attendance/manual", json={"person_id": 1, "status": "Present"})

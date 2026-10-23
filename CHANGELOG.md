@@ -11,6 +11,16 @@ All notable changes to Face Insight.
 - Deleting a person, clearing today and adding an admin ask for the password again if it was not typed in the last 15 minutes.
 - The database password is no longer sent to the browser.
 
+### People and reports
+- Registered people are stored in the database. On first start, names from `config.json` are moved there, after a backup.
+- A People tab with search, and a page per person: attendance day by day over any dates, first and last seen, the records behind each day, and renaming.
+- A daily summary per person: Present, Late or Absent, with first and last seen. Working days are a new setting.
+- A Reports tab: pick dates and people, then download CSV or PDF. Both files hold the same rows.
+- Date ranges on the Attendance tab and the Dashboard, and range exports.
+- Registration asks for the person's consent and stores when it was given. Prompts during capture ask the person to turn their head.
+- Collecting images for a taken ID can no longer rename that person, and manual marks only accept registered people.
+- Unknown faces are stored without a person ID; the recogniser's guess is kept separately.
+
 ### Audit log
 - A new tab lists sign-ins, failed sign-ins and every change or delete, with who did it and when. Filter by person, action and date.
 - Entries made while the database is offline are kept in a local file and still shown.

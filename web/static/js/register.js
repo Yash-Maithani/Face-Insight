@@ -41,6 +41,11 @@
     const personsCountBadge = document.getElementById("personsCountBadge");
 
     const idHint = document.getElementById("registerIdHint");
+    const consentGroup = document.getElementById("registerConsentGroup");
+    const consentBox = document.getElementById("registerConsent");
+    const consentDone = document.getElementById("registerConsentDone");
+    const errConsent = document.getElementById("errRegisterConsent");
+    const collectPrompt = document.getElementById("collectPrompt");
 
     // State
     let isCollecting = false;
@@ -59,7 +64,8 @@
     }
 
     // An ID that is already registered keeps its name. Collecting again adds
-    // images to that person instead of silently renaming them.
+    // images to that person instead of silently renaming them. Consent is
+    // asked once per person and stored with the time it was given.
     function syncExistingPerson() {
         const id = parseInt(inputPersonId.value, 10);
         const match = persons.find((p) => p.person_id === id);
@@ -69,7 +75,7 @@
             nameLocked = true;
             idHint.textContent =
                 `ID ${id} is already registered as ${match.name} (${match.image_count} images). ` +
-                "New images will be added to this person. To rename someone, use the Name / ID Manager in Settings.";
+                "New images will be added to this person. To rename someone, open them on the People page.";
             idHint.hidden = false;
         } else {
             if (nameLocked) inputName.value = "";
@@ -77,6 +83,21 @@
             nameLocked = false;
             idHint.hidden = true;
         }
+        const consentAt = match && match.consent_at;
+        consentGroup.hidden = Boolean(consentAt);
+        consentDone.hidden = !consentAt;
+        consentDone.textContent = consentAt ? `Consent recorded ${consentAt.replace("T", " ")}.` : "";
+        if (!consentAt) consentBox.checked = false;
+        errConsent.textContent = "";
+    }
+
+    consentBox.addEventListener("change", () => {
+        if (consentBox.checked) errConsent.textContent = "";
+    });
+
+    function showPrompt(text) {
+        collectPrompt.textContent = text || "";
+        collectPrompt.hidden = !text;
     }
 
     inputPersonId.addEventListener("input", () => {
@@ -253,6 +274,7 @@
             const errName = document.getElementById("errRegisterName");
             if (errId) errId.textContent = "";
             if (errName) errName.textContent = "";
+            errConsent.textContent = "";
             if (earlyStopNotice) earlyStopNotice.style.display = "none";
 
             const personId = parseInt(inputPersonId.value, 10);
@@ -272,6 +294,12 @@
                 valid = false;
             }
 
+            const needsConsent = !consentGroup.hidden;
+            if (needsConsent && !consentBox.checked) {
+                errConsent.textContent = "Ask the person first, then tick this box.";
+                valid = false;
+            }
+
             if (!valid) return;
 
             currentTarget = maxImages;
@@ -282,7 +310,7 @@
                 const res = await fetch("/api/collect/start", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ person_id: personId, name, max_images: maxImages }),
+                    body: JSON.stringify({ person_id: personId, name, max_images: maxImages, consent: needsConsent ? true : undefined }),
                 });
                 const data = await res.json();
                 if (!res.ok) {
@@ -293,6 +321,7 @@
 
                 window.App.showToast(`Collection started for ${name} (#${personId})`, "info");
                 setPreviewActive(true);
+                fetchPersons(); // now registered, with consent recorded
             } catch (err) {
                 window.App.showToast("Network error starting collection", "error");
                 btnStart.disabled = false;
@@ -356,18 +385,21 @@
             setRingProgress(data.count || 0, currentTarget);
             if (earlyStopNotice) earlyStopNotice.style.display = "none";
         }
+        showPrompt(isCollecting ? data.prompt : "");
     });
 
     // 2. collect:progress
     socket.on("collect:progress", (data) => {
         currentTarget = data.max_images || currentTarget || 500;
         setRingProgress(data.collected || 0, currentTarget);
+        showPrompt(data.prompt);
     });
 
     // 3. collect:done
     socket.on("collect:done", (data) => {
         window.App.showToast(`Collection complete for ${data.name}. Training started.`, "success");
         setPreviewActive(false);
+        showPrompt("");
         // Ready for the next person: clear the form and suggest a fresh ID
         idTouched = false;
         nameLocked = false;
@@ -380,6 +412,7 @@
     socket.on("collect:error", (data) => {
         window.App.showToast(`Collection error: ${data.message}`, "error");
         setPreviewActive(false);
+        showPrompt("");
     });
 
     // 5. train:status

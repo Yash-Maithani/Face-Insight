@@ -121,6 +121,16 @@ check("Non-int person_id (str) returns 400", res.status_code == 400)
 res = client.post("/api/attendance/manual", json={"person_id": True, "name": "Alice", "status": "Present"})
 check("Non-int person_id (bool) returns 400", res.status_code == 400)
 
+# Manual marks are for registered people only
+from helpers import register_people  # noqa: E402
+register_people(server, {101: "Alice Cooper", 102: "Bob Marley"})
+res = client.post("/api/attendance/manual", json={"person_id": 999, "name": "Nobody", "status": "Present"})
+check("Unregistered ID returns 404", res.status_code == 404)
+res = client.post("/api/attendance/manual", json={"person_id": 101, "name": "Bob Marley", "status": "Present"})
+check("Name that does not match the ID returns 400", res.status_code == 400)
+res = client.post("/api/attendance/manual", json={"person_id": 101, "name": "Alice Cooper", "status": "Unknown"})
+check("Manual Unknown returns 400", res.status_code == 400)
+
 # Valid manual mark
 res = client.post("/api/attendance/manual", json={"person_id": 101, "name": "Alice Cooper", "status": "Present"})
 check("Valid manual mark returns 200", res.status_code == 200)
@@ -137,9 +147,10 @@ check("Record created_at is ISO string", isinstance(rec.get("created_at"), str))
 res2 = client.post("/api/attendance/manual", json={"person_id": 102, "name": "Bob Marley", "status": "Late"})
 check("Second manual mark returns 200", res2.status_code == 200)
 
-# Third manual mark: Unknown
-res3 = client.post("/api/attendance/manual", json={"person_id": -1, "name": "Unknown Person", "status": "Unknown"})
-check("Third manual mark (Unknown) returns 200", res3.status_code == 200)
+# Third record: an Unknown face seen by the camera (manual marks cannot be Unknown)
+rec3 = server.engine.process_detection(-1, False, "", 0.0)
+check("Unknown face recorded", rec3 is not None)
+check("Unknown record has no person_id", rec3 is not None and rec3.get("person_id") is None)
 
 # Now check /api/attendance has 3 records
 res_list = client.get("/api/attendance")

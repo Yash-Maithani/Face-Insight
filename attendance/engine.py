@@ -94,7 +94,9 @@ class AttendanceEngine:
         name = self._names.get(person_id, "Unknown") if is_known else "Unknown"
 
         record = {
-            "person_id": person_id,
+            # An unknown face belongs to nobody. The recogniser's closest
+            # guess is kept apart, for checking later.
+            "person_id": person_id if is_known else None,
             "name": name,
             "date": now.strftime("%Y-%m-%d"),
             "time_in": now.strftime("%H:%M:%S"),
@@ -104,6 +106,8 @@ class AttendanceEngine:
             "manual": False,
             "has_snapshot": False,
         }
+        if not is_known:
+            record["guessed_person_id"] = person_id
 
         saved = self._db.insert_log(record)
         if saved:

@@ -31,6 +31,10 @@ SCRIPTS = [
     "test_auth.py",
     "test_audit_log.py",
     "test_preferences.py",
+    "test_daily_summary.py",
+    "test_migration.py",
+    "test_people.py",
+    "test_reports.py",
 ]
 
 RESULT = re.compile(r"RESULTS: (\d+) passed, (\d+) failed")
