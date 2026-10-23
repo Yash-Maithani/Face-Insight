@@ -78,7 +78,6 @@
     const manualPersonHint = document.getElementById("manualPersonHint");
     const manualStatus = document.getElementById("manualStatus");
     const btnManualSubmit = document.getElementById("btnManualSubmit");
-    const tableEmptyText = tableEmpty.querySelector("p");
 
     const btnExportExcel = document.getElementById("btnExportExcel");
     const btnExportCsv = document.getElementById("btnExportCsv");
@@ -134,10 +133,12 @@
     // date clears the table first, so one day's rows are never shown under
     // another day's date while the request is in flight.
     let isLoading = false;
+    let loadError = false;
     let loadedDate = null;
 
     function fetchRecords() {
         const requestedDate = selectedDate;
+        loadError = false;
         if (loadedDate !== requestedDate) {
             records = [];
             isLoading = true;
@@ -165,16 +166,16 @@
                 records = [];
                 loadedDate = null;
                 isLoading = false;
+                loadError = true;
                 updateCountsAndKpis();
                 renderTable();
-                App.showToast("Could not load attendance records", "error");
             });
     }
 
     // ── Counts and KPIs ──────────────────────────────────────────────────
     function updateCountsAndKpis() {
-        // Loading or offline: there is no count yet, and zero would be a false statement
-        const offline = isLoading || App.db.isConnected() === false;
+        // Loading, failed or offline: there is no count, and zero would be a false statement
+        const offline = isLoading || loadError || App.db.isConnected() === false;
         const count = (status) => (offline ? "--" : records.filter((r) => r.status === status).length);
 
         const total = offline ? "--" : records.length;
@@ -376,7 +377,7 @@
         tr.innerHTML = `
             <td data-label="Name"><strong>${App.escapeHtml(rec.name || "Unknown")}</strong></td>
             <td data-label="ID" class="col-num"><code>${personIdText(rec)}</code></td>
-            <td data-label="Time in">${App.escapeHtml(rec.time_in || "--")}</td>
+            <td data-label="Time in" class="mono">${App.escapeHtml(rec.time_in || "--")}</td>
             <td data-label="Status"><span class="status-badge ${statusClass}">${App.escapeHtml(rec.status || "Unknown")}</span></td>
             <td data-label="Emotion">${App.escapeHtml(rec.emotion || "--")}</td>
             <td data-label="Match" title="${App.escapeHtml(match.detail)}"><span>${matchHtml}</span></td>
@@ -393,15 +394,17 @@
 
         if (displayRecords.length === 0) {
             if (isLoading) {
-                tableEmptyText.textContent = "Loading records...";
+                App.renderState(tableEmpty, "loading", "Loading records...");
+            } else if (loadError) {
+                App.renderState(tableEmpty, "error", "Could not load records for this date.", fetchRecords);
             } else if (App.db.isConnected() === false) {
-                tableEmptyText.textContent = "Database offline. Records for this date cannot be loaded.";
+                App.renderState(tableEmpty, "error", "Database offline. Records for this date cannot be loaded.", fetchRecords);
             } else if (currentFilter !== "All" && records.length > 0) {
-                tableEmptyText.textContent = `No ${currentFilter} records for this date`;
+                App.renderState(tableEmpty, "empty", `No ${currentFilter} records for this date.`);
             } else {
-                tableEmptyText.textContent = "No attendance records for this date";
+                App.renderState(tableEmpty, "empty", "No attendance records for this date.");
             }
-            tableEmpty.style.display = "flex";
+            tableEmpty.style.display = "block";
             table.style.display = "none";
             return;
         }
@@ -414,7 +417,6 @@
             tableBody.appendChild(tr);
         });
 
-        App.staggerIn(tableBody.querySelectorAll("tr"));
     }
 
     // ── Detail Drawer ────────────────────────────────────────────────────
@@ -743,9 +745,7 @@
                     tableEmpty.style.display = "none";
                     table.style.display = "table";
                     const tr = createTableRow(record);
-                    const prefersReducedMotion = window.matchMedia &&
-                        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-                    tr.style.animation = prefersReducedMotion ? "none" : "eventSlideIn 0.2s ease-out 0ms both";
+                    tr.classList.add("is-new");
                     tableBody.prepend(tr);
                 }
             }

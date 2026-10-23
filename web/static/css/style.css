@@ -4,9 +4,128 @@
    The token list is explained in docs/architecture.md.
    ========================================================================== */
 
-/* --- Tokens: light mode (default) ---------------------------------------- */
+/* --- Fonts: IBM Plex, served from the app (licence in fonts/OFL.txt) ----- */
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-ext-400-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-400-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-ext-500-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-500-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-ext-600-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-600-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-ext-700-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-sans-latin-700-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'IBM Plex Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-mono-latin-ext-400-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'IBM Plex Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'IBM Plex Mono';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-mono-latin-ext-500-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'IBM Plex Mono';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* --- Tokens: light mode ---------------------------------------------------- */
 :root {
     color-scheme: light;
+
+    --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+    --sidebar-w: 224px;
+    --statusbar-h: 28px;
+
+    --info: #1f5fa8;
+    --info-soft: #e1ecf8;
+    --success-glow: rgba(23, 114, 47, 0.35);
 
     --bg: #f5f4f0;
     --surface: #ffffff;
@@ -67,25 +186,28 @@
 :root[data-mode="dark"] {
     color-scheme: dark;
 
-    --bg: #141413;
-    --surface: #1c1c1a;
-    --surface-2: #272724;
-    --border: #34342f;
-    --border-strong: #7a7972;
-    --text: #ecebe6;
-    --text-dim: #a8a69e;
-    --hover: rgba(236, 235, 230, 0.05);
+    --bg: #0b0d10;
+    --surface: #12151a;
+    --surface-2: #181c22;
+    --border: #242a32;
+    --border-strong: #6c7682;
+    --text: #e5e8ec;
+    --text-dim: #97a1ac;
+    --hover: rgba(229, 232, 236, 0.05);
     --overlay: rgba(0, 0, 0, 0.6);
     --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 
-    --success: #4cc26b;
-    --success-soft: #1b3122;
-    --warning: #e0a82e;
-    --warning-soft: #382c11;
+    --success: #3fb950;
+    --success-soft: #13281b;
+    --success-glow: rgba(63, 185, 80, 0.45);
+    --warning: #d29922;
+    --warning-soft: #2e2410;
     --danger: #f0736a;
     --danger-hover: #f48d85;
-    --danger-soft: #3c1e1c;
+    --danger-soft: #351b1a;
     --danger-contrast: #240a08;
+    --info: #58a6ff;
+    --info-soft: #142538;
 
     --chart-1: #ee8a4a;
     --chart-2: #4fc4bc;
@@ -123,7 +245,7 @@
 
 html, body {
     height: 100%;
-    font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-family: var(--font-sans);
     background: var(--bg);
     color: var(--text);
     line-height: 1.5;
@@ -145,98 +267,91 @@ html, body {
     outline-offset: -2px;
 }
 
-/* --- Top Bar ------------------------------------------------------------- */
-.top-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 24px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    position: sticky;
-    top: 0;
-    z-index: 100;
+/* --- App shell: sidebar, main area, status bar --------------------------- */
+body {
+    overflow: hidden;
 }
 
-.top-bar__brand {
+.shell {
+    display: grid;
+    grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) var(--statusbar-h);
+    grid-template-areas:
+        "side   main"
+        "status status";
+    height: 100vh;
+    height: 100dvh;
+}
+
+.sidebar {
+    grid-area: side;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+}
+
+.sidebar__brand {
     display: flex;
     align-items: center;
     gap: 10px;
-}
-
-.top-bar__icon {
-    width: 28px;
-    height: 28px;
-    color: var(--accent);
-}
-
-.top-bar__title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-}
-
-.top-bar__status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.8rem;
-    color: var(--text-dim);
-}
-
-.connection-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--danger);
-    transition: background var(--transition);
-}
-
-.connection-dot.connected {
-    background: var(--success);
-}
-
-/* --- Tab Navigation ------------------------------------------------------ */
-.tab-nav {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    padding: 0 24px;
+    height: 52px;
+    padding: 0 16px;
     border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    position: relative;
-    overflow-x: auto;
-    /* Scrolls sideways on a phone without drawing a scrollbar under the tabs */
-    scrollbar-width: none;
+    flex-shrink: 0;
 }
 
-.tab-nav::-webkit-scrollbar {
-    display: none;
+.sidebar__logo {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.sidebar__name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+}
+
+.sidebar__nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px;
+    overflow-y: auto;
 }
 
 .tab-btn {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 14px 20px;
+    gap: 10px;
+    height: 36px;
+    padding: 0 10px;
     background: none;
     border: none;
+    border-radius: var(--radius-sm);
     color: var(--text-dim);
     font-family: inherit;
     font-size: 0.85rem;
     font-weight: 500;
-    cursor: pointer;
-    transition: color var(--transition);
-    position: relative;
+    text-align: left;
     white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
 }
 
 .tab-btn:hover {
     color: var(--text);
+    background: var(--hover);
 }
 
 .tab-btn.active {
     color: var(--text);
+    background: var(--surface-2);
+    box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .tab-icon {
@@ -249,13 +364,14 @@ html, body {
     color: var(--accent);
 }
 
-/* Animated underline indicator */
-.tab-indicator {
-    position: absolute;
-    bottom: 0;
-    height: 2px;
-    background: var(--accent);
-    transition: left var(--transition), width var(--transition);
+/* Unsaved-changes marker on a tab */
+.tab-btn--dirty::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    margin-left: auto;
+    border-radius: 50%;
+    background: var(--warning);
 }
 
 .panel .card__title svg,
@@ -264,13 +380,66 @@ html, body {
     transition: color var(--transition);
 }
 
-/* Unsaved-changes marker on a tab */
-.tab-btn--dirty::after {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--warning);
+.shell__main {
+    grid-area: main;
+    min-width: 0;
+    overflow-y: auto;
+}
+
+/* Status bar: system state on the left, page context on the right (research B2) */
+.statusbar {
+    grid-area: status;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 12px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.statusbar__group {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-width: 0;
+}
+
+.sb-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sb-item__icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.sb-item__label {
+    transition: color 150ms ease;
+}
+
+.sb-item[data-state="danger"] .sb-item__label {
+    color: var(--danger);
+}
+
+/* Text that is only for screen readers */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 /* --- Database offline banner --------------------------------------------- */
@@ -298,7 +467,7 @@ html, body {
 
 /* --- Panels -------------------------------------------------------------- */
 .panels {
-    padding: 24px;
+    padding: 20px 24px 32px;
     max-width: 1440px;
     margin: 0 auto;
 }
@@ -324,19 +493,28 @@ html, body {
     color: var(--text-dim);
 }
 
+/* Data font: IDs, times, distances and counts line up in columns */
+code,
+.mono,
+.kpi-value,
+.stat-value,
+.slider-value,
+.event-item__time,
+.progress-ring__pct,
+.progress-ring__count,
+.match__num,
+.badge,
+.sb-item__time {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
 code {
-    font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
     font-size: 0.92em;
 }
 
 .panel.active {
     display: block;
-    animation: panelFadeIn 0.15s ease-out;
-}
-
-@keyframes panelFadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
 }
 
 /* --- Cards --------------------------------------------------------------- */
@@ -485,17 +663,17 @@ code {
     gap: 8px;
 }
 
-.status-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--text-dim);
-    transition: background var(--transition);
-    flex-shrink: 0;
+.live-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
 }
 
-.status-dot.active {
-    background: var(--success);
+.live-indicator.is-live {
+    color: var(--success);
+    font-weight: 600;
 }
 
 .feed-container {
@@ -585,7 +763,7 @@ code {
     position: absolute;
     inset: 0;
     background: var(--border-strong);
-    border-radius: 24px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     transition: background var(--transition);
 }
@@ -598,8 +776,7 @@ code {
     width: 18px;
     height: 18px;
     background: var(--surface);
-    border-radius: 50%;
-    transition: transform var(--transition);
+    border-radius: 2px;
 }
 
 .toggle input:checked + .toggle__slider {
@@ -724,11 +901,10 @@ code {
     padding: 8px;
 }
 
-.event-feed__empty {
-    text-align: center;
-    padding: 24px;
-    color: var(--text-dim);
-    font-size: 0.8rem;
+.card__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .event-item {
@@ -749,16 +925,6 @@ code {
     background: var(--hover);
 }
 
-.event-item__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.event-item__dot--present { background: var(--success); }
-.event-item__dot--late    { background: var(--warning); }
-.event-item__dot--unknown { background: var(--danger); }
 
 .event-item__info {
     flex: 1;
@@ -797,14 +963,57 @@ button.event-item {
     cursor: pointer;
 }
 
-/* Staggered entrance animation */
-.event-item {
-    animation: eventSlideIn 0.2s ease-out both;
+/* --- Status shapes: colour is never the only signal ---------------------- */
+.shape {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    background: currentColor;
 }
 
-@keyframes eventSlideIn {
-    from { opacity: 0; transform: translateY(-8px); }
-    to   { opacity: 1; transform: translateY(0); }
+.shape--present,
+.shape--ok,
+.shape--live {
+    color: var(--success);
+    border-radius: 50%;
+}
+
+.shape--late,
+.shape--warn {
+    color: var(--warning);
+    width: 9px;
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.shape--unknown,
+.shape--danger {
+    color: var(--danger);
+}
+
+.shape--off {
+    background: transparent;
+    border: 1.5px solid var(--text-dim);
+    border-radius: 50%;
+}
+
+/* --- Allowed motion (DESIGN.md): live indicator, new row, connection state */
+.shape--live {
+    animation: livePulse 2s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--success-glow); }
+    50%      { box-shadow: 0 0 0 4px var(--success-glow); }
+}
+
+.is-new {
+    animation: rowNew 1.5s ease-out;
+}
+
+@keyframes rowNew {
+    from { background-color: var(--accent-soft); }
+    to   { background-color: transparent; }
 }
 
 /* --- Badge --------------------------------------------------------------- */
@@ -826,7 +1035,7 @@ button.event-item {
 /* --- Toast --------------------------------------------------------------- */
 .toast-container {
     position: fixed;
-    bottom: 24px;
+    bottom: calc(var(--statusbar-h) + 16px);
     right: 24px;
     z-index: 1000;
     display: flex;
@@ -842,7 +1051,6 @@ button.event-item {
     box-shadow: var(--shadow);
     color: var(--text);
     font-size: 0.8rem;
-    animation: toastIn 0.2s ease-out;
     max-width: 360px;
 }
 
@@ -850,11 +1058,6 @@ button.event-item {
 .toast--error   { border-left: 3px solid var(--danger); }
 .toast--warning { border-left: 3px solid var(--warning); }
 .toast--info    { border-left: 3px solid var(--accent); }
-
-@keyframes toastIn {
-    from { opacity: 0; transform: translateY(12px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
 
 /* --- Placeholder text ---------------------------------------------------- */
 .placeholder-text {
@@ -952,6 +1155,11 @@ button.event-item {
 .kpi-card.active {
     border-color: var(--accent);
     box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.kpi-label .shape {
+    margin-right: 6px;
+    vertical-align: 1px;
 }
 
 .kpi-label {
@@ -1082,7 +1290,9 @@ button.event-item {
 }
 
 .data-table td {
-    padding: 12px 16px;
+    padding: 6px 12px;
+    height: 32px;
+    font-size: 0.8125rem;
     border-bottom: 1px solid var(--border);
     color: var(--text);
     white-space: nowrap;
@@ -1117,6 +1327,24 @@ button.event-item {
     line-height: 1;
 }
 
+.status-badge::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 6px;
+    background: currentColor;
+}
+
+.status-badge--present::before {
+    border-radius: 50%;
+}
+
+.status-badge--late::before {
+    width: 8px;
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
 .status-badge--present {
     background: var(--success-soft);
     color: var(--success);
@@ -1149,13 +1377,38 @@ button.event-item {
 }
 
 .table-empty {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+}
+
+/* --- Loading, empty and error states (App.renderState) ------------------- */
+.state {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 48px 24px;
+    justify-content: center;
+    gap: 8px;
+    padding: 32px 16px;
+    text-align: center;
     color: var(--text-dim);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+}
+
+.state__icon {
+    width: 20px;
+    height: 20px;
+}
+
+.state--loading .state__text {
+    font-family: var(--font-mono);
+}
+
+.state--error {
+    color: var(--text);
+}
+
+.state--error .state__icon {
+    color: var(--danger);
 }
 
 td.table-empty {
@@ -1179,7 +1432,6 @@ td.table-empty {
     z-index: 500;
     opacity: 0;
     pointer-events: none;
-    transition: opacity var(--transition);
 }
 
 .drawer-overlay.active {
@@ -1198,7 +1450,6 @@ td.table-empty {
     border-left: 1px solid var(--border);
     z-index: 501;
     transform: translateX(100%);
-    transition: transform var(--transition);
     display: flex;
     flex-direction: column;
     box-shadow: var(--shadow);
@@ -1307,12 +1558,10 @@ td.table-empty {
     display: none;
     align-items: center;
     justify-content: center;
-    transition: opacity var(--transition);
 }
 
 .modal-overlay.active {
     display: flex;
-    animation: panelFadeIn var(--transition);
 }
 
 .modal {
@@ -2097,39 +2346,11 @@ td.table-empty {
     }
 }
 
-/* --- Reduced Motion ------------------------------------ */
+/* --- Reduced Motion ------------------------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
-        animation-duration: 0.001ms !important;
-        animation-iteration-count: 1 !important;
+        animation: none !important;
         transition-duration: 0.001ms !important;
-    }
-
-    .tab-indicator {
-        transition: none !important;
-    }
-
-    .drawer {
-        transition: none !important;
-    }
-
-    .drawer-overlay {
-        transition: none !important;
-    }
-
-    .modal-overlay,
-    .modal {
-        animation: none !important;
-        transition: none !important;
-    }
-
-    .panel.active {
-        animation: none !important;
-    }
-
-    .event-item,
-    .data-table tbody tr {
-        animation: none !important;
     }
 }
 
@@ -2140,24 +2361,88 @@ td.table-empty {
     }
 }
 
-@media (max-width: 768px) {
-    .top-bar {
-        padding: 10px 16px;
+/* Laptops under 1366px and tablets: the sidebar becomes an icon rail */
+@media (max-width: 1365px) {
+    :root {
+        --sidebar-w: 56px;
     }
 
-    .top-bar__title {
-        font-size: 1rem;
+    .sidebar__brand {
+        justify-content: center;
+        padding: 0;
     }
 
-    .tab-nav {
-        padding: 0 12px;
+    .sidebar__name,
+    .tab-btn__label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
     }
 
     .tab-btn {
-        padding: 12px 14px;
-        font-size: 0.8rem;
+        justify-content: center;
+        padding: 0;
     }
 
+    .tab-btn--dirty::after {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+    }
+}
+
+/* Phones: the rail moves to the top */
+@media (max-width: 640px) {
+    .shell {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr) var(--statusbar-h);
+        grid-template-areas:
+            "side"
+            "main"
+            "status";
+    }
+
+    .sidebar {
+        flex-direction: row;
+        align-items: center;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar__brand {
+        width: 52px;
+        border-bottom: none;
+    }
+
+    .sidebar__nav {
+        flex-direction: row;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .sidebar__nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .tab-btn {
+        width: 44px;
+        flex-shrink: 0;
+    }
+
+    .tab-btn.active {
+        box-shadow: inset 0 -2px 0 var(--accent);
+    }
+
+    .sb-item__icon,
+    .statusbar__group--context {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
     .panels {
         padding: 16px;
     }

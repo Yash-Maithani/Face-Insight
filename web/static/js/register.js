@@ -163,7 +163,9 @@
         } catch (err) {
             console.error("fetchPersons error:", err);
             if (personsTableBody) {
-                personsTableBody.innerHTML = `<tr><td colspan="5" class="table-empty">Error loading persons</td></tr>`;
+                personsTableBody.innerHTML = `<tr><td colspan="5" class="table-empty"></td></tr>`;
+                window.App.renderState(personsTableBody.querySelector("td"), "error",
+                    "Could not load registered people.", fetchPersons);
             }
         }
     }
@@ -177,7 +179,9 @@
         if (personsCountBadge) window.App.setKpi(personsCountBadge, persons.length);
 
         if (!persons || persons.length === 0) {
-            personsTableBody.innerHTML = `<tr><td colspan="5" class="table-empty">No registered persons yet. Fill out the form above to add a person.</td></tr>`;
+            personsTableBody.innerHTML = `<tr><td colspan="5" class="table-empty"></td></tr>`;
+            window.App.renderState(personsTableBody.querySelector("td"), "empty",
+                "No one is registered yet. Fill in the form above to add a person.");
             return;
         }
 
@@ -211,7 +215,6 @@
             })
             .join("");
 
-        window.App.staggerIn(personsTableBody.querySelectorAll("tr"));
 
         // Bind delete buttons
         personsTableBody.querySelectorAll(".btn-delete-person").forEach((btn) => {

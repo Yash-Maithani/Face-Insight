@@ -28,6 +28,7 @@ SCRIPTS = [
     "test_db_status.py",
     "test_dashboard_period.py",
     "test_delete_records.py",
+    "test_assets.py",
 ]
 
 RESULT = re.compile(r"RESULTS: (\d+) passed, (\d+) failed")

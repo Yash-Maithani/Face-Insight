@@ -73,10 +73,10 @@
         settingsTabBtn.classList.toggle("tab-btn--dirty", dirty);
         btnDiscard.hidden = !dirty;
         if (dirty) {
-            settingsTabBtn.title = "Unsaved changes";
+            settingsTabBtn.title = "Settings (unsaved changes)";
             saveStatus.textContent = "Unsaved changes";
         } else {
-            settingsTabBtn.removeAttribute("title");
+            settingsTabBtn.title = "Settings";
             if (saveStatus.textContent === "Unsaved changes") saveStatus.textContent = "";
         }
     }
@@ -161,7 +161,8 @@
 
         const keys = Object.keys(localNames).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
         if (keys.length === 0) {
-            namesTableBody.innerHTML = `<tr><td colspan="3" class="table-empty">No names configured yet. Add one above.</td></tr>`;
+            namesTableBody.innerHTML = `<tr><td colspan="3" class="table-empty"></td></tr>`;
+            window.App.renderState(namesTableBody.querySelector("td"), "empty", "No names yet. Add one above.");
             return;
         }
 

@@ -5,9 +5,9 @@ Flask + Socket.IO entry point: routes, socket handlers and app wiring.
 Run:  python server.py   then open http://localhost:5000
 """
 
+import hashlib
 import logging
 import os
-import time
 import tempfile
 from datetime import datetime
 
@@ -107,9 +107,29 @@ logger.info("Available cameras: %s", available_cameras)
 
 
 # ── Asset cache-busting ────────────────────────────────────────────
+def static_fingerprint(root):
+    """Short hash of every file under `root` (names and contents).
+
+    It changes only when a file changes, so browsers can keep cached copies
+    between requests and still fetch new ones after an update.
+    """
+    digest = hashlib.sha1()
+    for folder, dirs, files in os.walk(root):
+        dirs.sort()
+        for name in sorted(files):
+            path = os.path.join(folder, name)
+            digest.update(os.path.relpath(path, root).replace(os.sep, "/").encode("utf-8"))
+            with open(path, "rb") as f:
+                digest.update(f.read())
+    return digest.hexdigest()[:12]
+
+
+ASSET_VERSION = static_fingerprint(os.path.join(os.path.dirname(os.path.abspath(__file__)), "web"))
+
+
 @app.context_processor
 def inject_asset_version():
-    return {"asset_v": int(time.time())}
+    return {"asset_v": ASSET_VERSION}
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────

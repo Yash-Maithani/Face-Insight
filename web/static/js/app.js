@@ -178,100 +178,61 @@
     });
 
     // ── setKpi helper ────────────────────────────────────────────────────
+    // Sets a figure. Null or undefined shows "--": no number is better than
+    // a wrong one. Values change at once; there is no count-up animation.
     function setKpi(el, value) {
         if (!el) return;
-
-        if (value === null || value === undefined) {
-            value = "--";
-        }
-
-        const valueStr = String(value).trim();
-        const prefersReducedMotion = window.matchMedia &&
-            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-        if (el._kpiRaf) {
-            cancelAnimationFrame(el._kpiRaf);
-            el._kpiRaf = null;
-        }
-
-        if (prefersReducedMotion || valueStr === "--") {
-            el.textContent = valueStr;
-            el._kpiCurrent = valueStr;
-            return;
-        }
-
-        // Match integer, decimal, or percentage: e.g. "42", "12.5", "33.3%", "100%"
-        const match = valueStr.match(/^([+-]?\d+(?:\.\d+)?)(%)?$/);
-        if (!match) {
-            el.textContent = valueStr;
-            el._kpiCurrent = valueStr;
-            return;
-        }
-
-        const targetNum = parseFloat(match[1]);
-        const isPercent = match[2] === "%";
-        const decimalPlaces = match[1].includes(".") ? match[1].split(".")[1].length : 0;
-
-        let startNum = 0;
-        const prevStr = el._kpiCurrent !== undefined ? String(el._kpiCurrent) : el.textContent.trim();
-        const prevMatch = prevStr.match(/^([+-]?\d+(?:\.\d+)?)(%)?$/);
-        if (prevMatch) {
-            startNum = parseFloat(prevMatch[1]);
-        } else {
-            startNum = 0;
-        }
-
-        if (startNum === targetNum) {
-            el.textContent = valueStr;
-            el._kpiCurrent = valueStr;
-            return;
-        }
-
-        const duration = 500; // ms
-        const startTime = performance.now();
-
-        function step(now) {
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            // Cubic ease-out: 1 - (1 - t)^3
-            const easeOut = 1 - Math.pow(1 - progress, 3);
-            const currentNum = startNum + (targetNum - startNum) * easeOut;
-
-            let displayStr = decimalPlaces > 0
-                ? currentNum.toFixed(decimalPlaces)
-                : Math.round(currentNum).toString();
-
-            if (isPercent) displayStr += "%";
-            el.textContent = displayStr;
-
-            if (progress < 1) {
-                el._kpiRaf = requestAnimationFrame(step);
-            } else {
-                el.textContent = valueStr;
-                el._kpiCurrent = valueStr;
-                el._kpiRaf = null;
-            }
-        }
-
-        el._kpiRaf = requestAnimationFrame(step);
+        el.textContent = value === null || value === undefined ? "--" : String(value).trim();
     }
 
-    // ── staggerIn helper ─────────────────────────────────────────────────
-    function staggerIn(elements, baseDelay = 30, maxItems = 10) {
-        if (!elements) return;
-        const list = Array.isArray(elements) ? elements : Array.from(elements);
-        const prefersReducedMotion = window.matchMedia &&
-            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Kept so older callers still work. Lists now appear at once.
+    function staggerIn() {}
 
-        list.forEach((el, index) => {
-            if (!el) return;
-            if (prefersReducedMotion) {
-                el.style.animation = "none";
-                return;
-            }
-            const delay = Math.min(index, maxItems - 1) * baseDelay;
-            el.style.animation = `eventSlideIn 0.2s ease-out ${delay}ms both`;
-        });
+    // ── Panel states ─────────────────────────────────────────────────────
+    // One look for loading, empty and error everywhere. The container's
+    // content is replaced. Passing onRetry adds a Retry button.
+    const ICON_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"';
+    const STATE_ICONS = {
+        // Lucide "loader" and "circle-alert"
+        loading: `<svg class="state__icon" aria-hidden="true" ${ICON_ATTRS}><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>`,
+        error: `<svg class="state__icon" aria-hidden="true" ${ICON_ATTRS}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>`,
+        empty: "",
+    };
+
+    function renderState(container, kind, text, onRetry) {
+        if (!container) return;
+        container.dataset.state = kind;
+        container.innerHTML =
+            `<div class="state state--${kind}" role="${kind === "error" ? "alert" : "status"}">` +
+            `${STATE_ICONS[kind] || ""}<p class="state__text"></p></div>`;
+        container.querySelector(".state__text").textContent = text;
+        if (onRetry) {
+            const retry = document.createElement("button");
+            retry.type = "button";
+            retry.className = "btn btn--ghost btn--sm";
+            retry.textContent = "Retry";
+            retry.addEventListener("click", onRetry);
+            container.querySelector(".state").appendChild(retry);
+        }
+    }
+
+    // ── Status bar ───────────────────────────────────────────────────────
+    // Camera, database and server connection. Each item shows a shape, a
+    // colour and a word together (research B1, B2).
+    const STATUS_SHAPES = { ok: "shape--ok", live: "shape--live", warn: "shape--warn", danger: "shape--danger", off: "shape--off" };
+
+    function setStatusItem(id, state, text) {
+        const item = document.getElementById(id);
+        if (!item) return;
+        item.dataset.state = state;
+        item.querySelector(".shape").className = "shape " + (STATUS_SHAPES[state] || "shape--off");
+        item.querySelector(".sb-item__label").textContent = text;
+    }
+
+    const sbUpdated = document.getElementById("sbUpdated");
+
+    function markUpdated() {
+        if (sbUpdated) sbUpdated.textContent = new Date().toLocaleTimeString([], { hour12: false });
     }
 
     // ── Theme: mode (light/dark/system) + color theme ────────────────────
@@ -298,7 +259,7 @@
         }
     }
 
-    let themeMode = readStored("fa-mode", THEME_MODES, "system");
+    let themeMode = readStored("fa-mode", THEME_MODES, "dark");
     let themeColor = readStored("fa-theme", THEME_COLORS, "orange");
 
     function applyTheme() {
@@ -347,27 +308,6 @@
     const tabNav = document.getElementById("tabNav");
     const tabBtns = tabNav.querySelectorAll(".tab-btn");
     const panels = document.querySelectorAll(".panel");
-    const indicator = document.getElementById("tabIndicator");
-
-    function updateIndicator(btn, immediate = false) {
-        if (!btn || !indicator) return;
-        const prefersReducedMotion = window.matchMedia &&
-            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-        if (immediate || prefersReducedMotion) {
-            indicator.style.transition = "none";
-        } else {
-            indicator.style.transition = "left var(--transition), width var(--transition)";
-        }
-
-        indicator.style.left = btn.offsetLeft + "px";
-        indicator.style.width = btn.offsetWidth + "px";
-
-        if (immediate && !prefersReducedMotion) {
-            void indicator.offsetWidth;
-            indicator.style.transition = "left var(--transition), width var(--transition)";
-        }
-    }
 
     // ── Route: #<tab>[/<arg>] keeps the open tab and its argument in the URL ──
     const TAB_TITLES = {
@@ -416,9 +356,8 @@
         });
         btn.classList.add("active");
         btn.setAttribute("aria-selected", "true");
-        // On a narrow screen the tab bar scrolls: keep the open tab in view
+        // On a phone the navigation scrolls sideways: keep the open tab in view
         btn.scrollIntoView({ block: "nearest", inline: "nearest" });
-        updateIndicator(btn, false);
 
         panels.forEach((p) => p.classList.remove("active"));
         const panel = document.getElementById("panel-" + tabName);
@@ -441,15 +380,6 @@
 
     tabBtns.forEach((btn) => {
         btn.addEventListener("click", () => navigateTo(btn.dataset.tab));
-    });
-
-    // Set initial indicator position without transition flash
-    const initialBtn = tabNav.querySelector(".tab-btn.active");
-    if (initialBtn) updateIndicator(initialBtn, true);
-
-    window.addEventListener("resize", () => {
-        const active = tabNav.querySelector(".tab-btn.active");
-        if (active) updateIndicator(active, true);
     });
 
     // Open the tab named in the URL once every script has registered its listeners
@@ -476,18 +406,9 @@
     });
 
     // ── Connection status ────────────────────────────────────────────────
-    const connDot = document.getElementById("connectionDot");
-    const connLabel = document.getElementById("connectionLabel");
-
-    socket.on("connect", () => {
-        connDot.classList.add("connected");
-        connLabel.textContent = "Connected";
-    });
-
-    socket.on("disconnect", () => {
-        connDot.classList.remove("connected");
-        connLabel.textContent = "Disconnected";
-    });
+    socket.on("connect", () => setStatusItem("sbSocket", "ok", "Server connected"));
+    socket.on("disconnect", () => setStatusItem("sbSocket", "danger", "Server disconnected"));
+    socket.io.on("reconnect_attempt", () => setStatusItem("sbSocket", "warn", "Reconnecting to server"));
 
     // ── Database status ──────────────────────────────────────────────────
     // null = not reported yet; true/false = last value the server sent.
@@ -502,6 +423,7 @@
         const previous = dbConnected;
         dbConnected = value;
         dbBanner.hidden = value;
+        setStatusItem("sbDatabase", value ? "ok" : "danger", value ? "Database connected" : "Database offline");
         window.dispatchEvent(
             new CustomEvent("db:status", { detail: { connected: value, previous } })
         );
@@ -535,6 +457,15 @@
     const btnStop = document.getElementById("btnCameraStop");
     const btnFeedStart = document.getElementById("btnFeedStart");
     const statusDot = document.getElementById("cameraStatusDot");
+    const cameraLive = document.getElementById("cameraLive");
+    const cameraLiveText = document.getElementById("cameraLiveText");
+
+    function showCameraState(running) {
+        statusDot.className = "shape " + (running ? "shape--live" : "shape--off");
+        cameraLive.classList.toggle("is-live", running);
+        cameraLiveText.textContent = running ? "Live" : "Off";
+        setStatusItem("sbCamera", running ? "live" : "off", running ? "Camera live" : "Camera off");
+    }
     const videoFeed = document.getElementById("videoFeed");
     const feedEmpty = document.getElementById("feedEmpty");
 
@@ -565,6 +496,7 @@
         btnStart.disabled = pending || cameraRunning;
         btnFeedStart.disabled = pending;
         feedEmptyText.textContent = pending ? "Starting camera..." : "No camera active";
+        if (pending) setStatusItem("sbCamera", "warn", "Camera starting");
     }
 
     // Stays in the feed area until the next attempt, unlike a toast
@@ -618,7 +550,7 @@
         setCameraPending(false);
         if (running) {
             showCameraError("");
-            statusDot.classList.add("active");
+            showCameraState(true);
             btnStart.disabled = true;
             btnStop.disabled = false;
             feedEmpty.style.display = "none";
@@ -626,7 +558,7 @@
             // Point to MJPEG stream with cache-bust
             videoFeed.src = "/video_feed?" + Date.now();
         } else {
-            statusDot.classList.remove("active");
+            showCameraState(false);
             btnStart.disabled = false;
             btnStop.disabled = true;
             feedEmpty.style.display = "flex";
@@ -638,6 +570,7 @@
     socket.on("camera:error", (data) => {
         const message = data.message || "Camera error";
         showCameraError(message);
+        setStatusItem("sbCamera", "danger", "Camera error");
         // The inline message is only visible on Live Monitor
         if (!document.getElementById("panel-monitor").classList.contains("active")) {
             showToast(message, "error");
@@ -652,6 +585,7 @@
 
     function applyStats(data) {
         if (!data) return;
+        markUpdated();
         setDbConnected(data.db_connected);
         if (data.fps !== undefined) statFps.textContent = data.fps;
         if (data.faces !== undefined) setKpi(statFaces, data.faces);
@@ -767,8 +701,42 @@
     // ── Live Monitor: Event Feed ─────────────────────────────────────────
     const eventFeed = document.getElementById("eventFeed");
     const eventBadge = document.getElementById("eventBadge");
+    const btnFeedPause = document.getElementById("btnFeedPause");
+    const btnFeedClear = document.getElementById("btnFeedClear");
     let unreadCount = 0;
     const MAX_EVENTS = 50;
+
+    // Pause holds new events back so the list can be read; Resume adds them
+    // (research B3). Events are never lost while paused.
+    let feedPaused = false;
+    const heldEvents = [];
+
+    function renderPauseButton() {
+        btnFeedPause.setAttribute("aria-pressed", String(feedPaused));
+        btnFeedPause.querySelector(".icon-pause").hidden = feedPaused;
+        btnFeedPause.querySelector(".icon-play").hidden = !feedPaused;
+        btnFeedPause.querySelector(".btn__label").textContent = !feedPaused
+            ? "Pause"
+            : heldEvents.length ? `Resume (${heldEvents.length} new)` : "Resume";
+    }
+
+    function showFeedEmpty() {
+        renderState(eventFeed, "empty", "No attendance recorded yet today.");
+    }
+
+    btnFeedPause.addEventListener("click", () => {
+        feedPaused = !feedPaused;
+        if (!feedPaused) {
+            heldEvents.splice(0).forEach((record) => insertEventItem(record));
+        }
+        renderPauseButton();
+    });
+
+    btnFeedClear.addEventListener("click", () => {
+        heldEvents.length = 0;
+        renderState(eventFeed, "empty", "List cleared. New attendance will appear here.");
+        renderPauseButton();
+    });
 
     function isMonitorVisible() {
         const monitorPanel = document.getElementById("panel-monitor");
@@ -788,10 +756,10 @@
 
     function createEventItemElement(record) {
         const status = (record.status || "unknown").toLowerCase();
-        const dotClass =
-            status === "present" ? "event-item__dot--present" :
-            status === "late" ? "event-item__dot--late" :
-            "event-item__dot--unknown";
+        const shapeClass =
+            status === "present" ? "shape--present" :
+            status === "late" ? "shape--late" :
+            "shape--unknown";
 
         const item = document.createElement("button");
         item.type = "button";
@@ -802,26 +770,23 @@
             item.addEventListener("click", () => navigateTo("attendance", { recordId: record.id }));
         }
         item.innerHTML = `
-            <span class="event-item__dot ${dotClass}"></span>
+            <span class="shape ${shapeClass}" aria-hidden="true"></span>
             <div class="event-item__info">
                 <div class="event-item__name">${escapeHtml(record.name || "Unknown")}</div>
-                <div class="event-item__meta">${escapeHtml(record.emotion || "")} &middot; ${escapeHtml(record.status || "")}</div>
+                <div class="event-item__meta">${[record.status, record.emotion].filter(Boolean).map(escapeHtml).join(" &middot; ")}</div>
             </div>
             <span class="event-item__time">${escapeHtml(record.time_in || "")}</span>
         `;
         return item;
     }
 
-    function addEventItem(record) {
-        // Remove empty placeholder
-        const emptyMsg = eventFeed.querySelector(".event-feed__empty");
-        if (emptyMsg) emptyMsg.remove();
+    function insertEventItem(record) {
+        // Remove the empty state
+        const state = eventFeed.querySelector(".state");
+        if (state) state.remove();
 
         const item = createEventItemElement(record);
-        // Single live row animates in on its own without stagger delay
-        const prefersReducedMotion = window.matchMedia &&
-            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        item.style.animation = prefersReducedMotion ? "none" : "eventSlideIn 0.2s ease-out 0ms both";
+        item.classList.add("is-new");
 
         // Insert at top (newest first)
         eventFeed.prepend(item);
@@ -830,6 +795,15 @@
         const items = eventFeed.querySelectorAll(".event-item");
         if (items.length > MAX_EVENTS) {
             items[items.length - 1].remove();
+        }
+    }
+
+    function addEventItem(record) {
+        if (feedPaused) {
+            heldEvents.push(record);
+            renderPauseButton();
+        } else {
+            insertEventItem(record);
         }
 
         // Badge management
@@ -845,17 +819,22 @@
         fetch("/api/attendance")
             .then((r) => r.json())
             .then((records) => {
-                if (!Array.isArray(records) || records.length === 0) return;
+                if (!Array.isArray(records) || records.length === 0) {
+                    showFeedEmpty();
+                    return;
+                }
                 eventFeed.innerHTML = "";
                 [...records]
                     .sort((a, b) => (b.time_in || "").localeCompare(a.time_in || ""))
                     .slice(0, MAX_EVENTS)
                     .forEach((rec) => eventFeed.appendChild(createEventItemElement(rec)));
-                staggerIn(eventFeed.querySelectorAll(".event-item"));
             })
-            .catch(() => {});
+            .catch(() => {
+                renderState(eventFeed, "error", "Could not load today's attendance.", loadEventFeed);
+            });
     }
 
+    renderState(eventFeed, "loading", "Loading...");
     loadEventFeed();
 
     window.addEventListener("db:status", (e) => {
@@ -871,9 +850,7 @@
         eventFeed.querySelectorAll(".event-item").forEach((item) => {
             if (ids.has(item.dataset.id)) item.remove();
         });
-        if (!eventFeed.querySelector(".event-item")) {
-            eventFeed.innerHTML = '<p class="event-feed__empty">No events yet</p>';
-        }
+        if (!eventFeed.querySelector(".event-item")) showFeedEmpty();
     });
 
     // Clear badge when page regains focus while on monitor tab
@@ -909,6 +886,7 @@
         showToast,
         setKpi,
         staggerIn,
+        renderState,
         navigateTo,
         escapeHtml,
     };

@@ -1,6 +1,6 @@
 /* ==========================================================================
    dashboard.js - Dashboard analytics tab
-   Chart.js charts (weekly stacked bar, emotion doughnut, top persons bar),
+   Chart.js charts (attendance trend bars, emotion doughnut, days attended),
    KPI cards (Top Emotion, Week Total, Today Total, Late Rate),
    cross-navigation to Attendance tab, and debounced live refresh.
    ========================================================================== */
@@ -98,6 +98,20 @@
     // ── Fetch and Render Dashboard ───────────────────────────────────────
     let isFetching = false;
     let refetchWanted = false;
+    let loadFailed = false;
+
+    // Returns the parsed JSON, or the fallback and marks the load as failed
+    function getJson(url, fallback) {
+        return fetch(url)
+            .then((r) => {
+                if (!r.ok) throw new Error(url + " " + r.status);
+                return r.json();
+            })
+            .catch(() => {
+                loadFailed = true;
+                return fallback;
+            });
+    }
 
     function refreshDashboard() {
         if (isFetching) {
@@ -106,12 +120,13 @@
             return;
         }
         isFetching = true;
+        loadFailed = false;
 
         Promise.all([
-            fetch(`/api/stats/weekly?days=${rangeDays}`).then((r) => r.json()).catch(() => []),
-            fetch("/api/stats/emotions").then((r) => r.json()).catch(() => ({})),
-            fetch(`/api/stats/persons?days=${rangeDays}`).then((r) => r.json()).catch(() => []),
-            fetch("/api/stats/today").then((r) => r.json()).catch(() => ({})),
+            getJson(`/api/stats/weekly?days=${rangeDays}`, []),
+            getJson("/api/stats/emotions", {}),
+            getJson(`/api/stats/persons?days=${rangeDays}`, []),
+            getJson("/api/stats/today", {}),
         ])
             .then(([weekly, emotions, persons, todayStats]) => {
                 renderKpis(weekly, emotions, todayStats);
@@ -141,16 +156,21 @@
 
     // Empty states say why there is nothing to draw
     function showEmpty(canvas, emptyEl, message) {
-        emptyEl.querySelector("p").textContent =
-            App.db.isConnected() === false ? "Database offline. Chart data cannot be loaded." : message;
+        if (loadFailed) {
+            App.renderState(emptyEl, "error", "Could not load chart data.", refreshDashboard);
+        } else if (App.db.isConnected() === false) {
+            App.renderState(emptyEl, "error", "Database offline. Chart data cannot be loaded.", refreshDashboard);
+        } else {
+            App.renderState(emptyEl, "empty", message);
+        }
         canvas.style.display = "none";
         emptyEl.style.display = "flex";
     }
 
     // ── Render KPIs ──────────────────────────────────────────────────────
     function renderKpis(weekly, emotions, todayStats) {
-        // Offline: every figure here comes from the database, so show none
-        if (App.db.isConnected() === false) {
+        // Offline or a failed load: every figure here comes from the database, so show none
+        if (loadFailed || App.db.isConnected() === false) {
             [kpiTopEmotion, kpiWeekTotal, kpiTodayTotal, kpiLateRate].forEach((el) => App.setKpi(el, "--"));
             return;
         }
@@ -265,11 +285,11 @@
                 },
                 scales: {
                     x: {
-                        stacked: true,
+                        stacked: false,
                         grid: { display: false },
                     },
                     y: {
-                        stacked: true,
+                        stacked: false,
                         beginAtZero: true,
                         ticks: { stepSize: 1, precision: 0 },
                         grid: { color: cssVar("--border") },
@@ -428,7 +448,7 @@
     // Until the first answer arrives, say so instead of showing blank cards
     [[canvasWeekly, emptyWeekly], [canvasEmotions, emptyEmotions], [canvasPersons, emptyPersons]].forEach(
         ([canvas, emptyEl]) => {
-            emptyEl.querySelector("p").textContent = "Loading...";
+            App.renderState(emptyEl, "loading", "Loading...");
             canvas.style.display = "none";
             emptyEl.style.display = "flex";
         }

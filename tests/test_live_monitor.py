@@ -145,7 +145,8 @@ html_resp = urllib.request.urlopen(f"{BASE}/")
 html = html_resp.read().decode()
 check("/ returns 200", html_resp.status == 200)
 check("Has Socket.IO CDN", "socket.io" in html.lower())
-check("Has IBM Plex Sans font", "IBM+Plex+Sans" in html)
+_css = open(os.path.join(PROJECT_ROOT, "web", "static", "css", "style.css"), encoding="utf-8").read()
+check("Has IBM Plex Sans font (served by the app)", "font-family: 'IBM Plex Sans'" in _css)
 check("Has 5 tabs", html.count('data-tab=') == 5)
 
 # WebSocket test
