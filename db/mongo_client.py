@@ -4,13 +4,13 @@ Thin wrapper around a single ``attendance_logs`` MongoDB collection.
 
 Design rules:
 - Short server-selection timeout so an unreachable Mongo fails fast.
-- When disconnected, methods return empty results – never raise.
+- When disconnected, methods return empty results: never raise.
 """
 
 import logging
 from datetime import datetime, timedelta
 
-from pymongo import MongoClient, ASCENDING
+from pymongo import MongoClient, ASCENDING, DESCENDING
 from pymongo.errors import PyMongoError
 
 logger = logging.getLogger(__name__)
@@ -52,8 +52,9 @@ class MongoAttendanceDB:
             self._collection = db["attendance_logs"]
             # Index on `date` for fast queries.
             self._collection.create_index([("date", ASCENDING)])
+            db["audit_log"].create_index([("ts", DESCENDING)])
             self._connected = True
-            logger.info("MongoDB connected – %s / %s", mask_mongo_uri(self._uri), self._db_name)
+            logger.info("MongoDB connected: %s / %s", mask_mongo_uri(self._uri), self._db_name)
         except PyMongoError as exc:
             logger.warning("MongoDB unreachable (%s): %s", mask_mongo_uri(self._uri), exc)
             self._connected = False
@@ -161,6 +162,45 @@ class MongoAttendanceDB:
             return [str(i) for i in ids]
         except PyMongoError as exc:
             logger.error("delete_logs_by_date failed: %s", exc)
+            self._connected = False
+            return None
+
+    # ── audit log ─────────────────────────────────────────────────────────
+
+    def insert_audit(self, entry: dict) -> bool:
+        """Store one audit entry. False if the DB is unreachable."""
+        if not self._connected:
+            return False
+        try:
+            self._client[self._db_name]["audit_log"].insert_one(entry)
+            return True
+        except PyMongoError as exc:
+            logger.error("insert_audit failed: %s", exc)
+            self._connected = False
+            return False
+
+    def find_audit(self, query: dict, limit=None) -> list | None:
+        """Audit entries matching `query`, newest first. None if unreachable."""
+        if not self._connected:
+            return None
+        try:
+            cursor = self._client[self._db_name]["audit_log"].find(query, {"_id": 0}).sort("ts", DESCENDING)
+            if limit:
+                cursor = cursor.limit(limit)
+            return list(cursor)
+        except PyMongoError as exc:
+            logger.error("find_audit failed: %s", exc)
+            self._connected = False
+            return None
+
+    def count_audit(self, query: dict) -> int | None:
+        """Number of audit entries matching `query`. None if unreachable."""
+        if not self._connected:
+            return None
+        try:
+            return self._client[self._db_name]["audit_log"].count_documents(query)
+        except PyMongoError as exc:
+            logger.error("count_audit failed: %s", exc)
             self._connected = False
             return None
 

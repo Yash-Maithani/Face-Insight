@@ -17,7 +17,6 @@ import sys
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(TESTS_DIR)
 
-# test_websocket.py needs a server that is already running, so it is not here
 SCRIPTS = [
     "test_core.py",
     "test_live_monitor.py",
@@ -29,6 +28,9 @@ SCRIPTS = [
     "test_dashboard_period.py",
     "test_delete_records.py",
     "test_assets.py",
+    "test_auth.py",
+    "test_audit_log.py",
+    "test_preferences.py",
 ]
 
 RESULT = re.compile(r"RESULTS: (\d+) passed, (\d+) failed")

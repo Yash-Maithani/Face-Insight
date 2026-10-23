@@ -114,6 +114,188 @@
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* --- Fonts for the font picker (licences in fonts/OFL-*.txt) ----------- */
+
+@font-face {
+    font-family: 'Source Sans 3';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/source-sans-3-latin-ext-400-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Source Sans 3';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/source-sans-3-latin-400-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Source Sans 3';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/source-sans-3-latin-ext-500-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Source Sans 3';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/source-sans-3-latin-500-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Source Sans 3';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/source-sans-3-latin-ext-600-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Source Sans 3';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/source-sans-3-latin-600-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Source Sans 3';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/source-sans-3-latin-ext-700-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Source Sans 3';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/source-sans-3-latin-700-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/inter-latin-ext-400-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/inter-latin-400-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/inter-latin-ext-500-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/inter-latin-500-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/inter-latin-ext-600-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/inter-latin-600-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/inter-latin-ext-700-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/inter-latin-700-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Atkinson Hyperlegible';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/atkinson-hyperlegible-latin-ext-400-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Atkinson Hyperlegible';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/atkinson-hyperlegible-latin-400-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Atkinson Hyperlegible';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/atkinson-hyperlegible-latin-ext-700-normal.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Atkinson Hyperlegible';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/atkinson-hyperlegible-latin-700-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* --- Tokens: light mode ---------------------------------------------------- */
 :root {
     color-scheme: light;
@@ -235,6 +417,11 @@
 :root[data-theme="olive"]  { --accent: var(--t-olive);  --accent-hover: var(--t-olive-hover);  --accent-contrast: var(--t-olive-contrast);  --accent-soft: var(--t-olive-soft); }
 :root[data-theme="coffee"] { --accent: var(--t-coffee); --accent-hover: var(--t-coffee-hover); --accent-contrast: var(--t-coffee-contrast); --accent-soft: var(--t-coffee-soft); }
 :root[data-theme="steel"]  { --accent: var(--t-steel);  --accent-hover: var(--t-steel-hover);  --accent-contrast: var(--t-steel-contrast);  --accent-soft: var(--t-steel-soft); }
+
+/* --- UI font chosen per user (the data font stays IBM Plex Mono) --------- */
+:root[data-font="source"]   { --font-sans: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+:root[data-font="inter"]    { --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+:root[data-font="atkinson"] { --font-sans: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif; }
 
 /* --- Reset & Base -------------------------------------------------------- */
 *, *::before, *::after {
@@ -372,6 +559,36 @@ body {
     margin-left: auto;
     border-radius: 50%;
     background: var(--warning);
+}
+
+.sidebar__foot {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+}
+
+.sidebar__user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.sidebar__user-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+}
+
+.sidebar__logout {
+    margin: 0;
 }
 
 .panel .card__title svg,
@@ -2250,6 +2467,151 @@ td.table-empty {
     color: var(--text-dim);
 }
 
+/* --- Sign-in and setup pages ------------------------------------------- */
+body.auth-page {
+    overflow: auto;
+}
+
+.auth {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px 16px;
+}
+
+.auth__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.auth__panel {
+    width: 100%;
+    max-width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 24px;
+}
+
+.auth__title {
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+
+.auth__lead {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+.auth__submit {
+    justify-content: center;
+    height: 36px;
+}
+
+.auth__note {
+    max-width: 360px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+/* --- Font picker ----------------------------------------------------------- */
+.font-swatch {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.font-swatch__sample {
+    font-size: 1.1rem;
+    line-height: 1.2;
+}
+
+.font-swatch[data-font-option="plex"] .font-swatch__sample     { font-family: 'IBM Plex Sans', sans-serif; }
+.font-swatch[data-font-option="source"] .font-swatch__sample   { font-family: 'Source Sans 3', sans-serif; }
+.font-swatch[data-font-option="atkinson"] .font-swatch__sample { font-family: 'Atkinson Hyperlegible', sans-serif; }
+.font-swatch[data-font-option="inter"] .font-swatch__sample    { font-family: 'Inter', sans-serif; }
+
+/* --- Accounts card ------------------------------------------------------- */
+.settings-accounts-card {
+    grid-column: 1 / -1;
+}
+
+.accounts-body {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+    padding: 16px 20px;
+}
+
+.accounts-body h4 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.accounts-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.accounts-form .btn {
+    align-self: flex-start;
+}
+
+@media (max-width: 1100px) {
+    .accounts-body {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --- Audit log ------------------------------------------------------------- */
+.audit-filters {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.audit-filters .form-group {
+    flex: 0 1 auto;
+    min-width: 160px;
+}
+
+@media (max-width: 640px) {
+    .audit-filters .form-group {
+        flex: 1 1 140px;
+    }
+
+    .audit-filters .form-input {
+        width: 100%;
+    }
+}
+
+.audit-table td {
+    white-space: normal;
+    vertical-align: top;
+}
+
+.audit-table .audit-details {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+}
+
+.audit-note {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
 /* --- Narrow screens ------------------------------------------------------ */
 @media (max-width: 640px) {
     .camera-controls {
@@ -2392,6 +2754,16 @@ td.table-empty {
         top: 6px;
         right: 6px;
     }
+
+    .sidebar__foot {
+        flex-direction: column;
+        padding: 10px 0;
+    }
+
+    .sidebar__user,
+    .sidebar__logout .btn__label {
+        display: none;
+    }
 }
 
 /* Phones: the rail moves to the top */
@@ -2434,6 +2806,13 @@ td.table-empty {
 
     .tab-btn.active {
         box-shadow: inset 0 -2px 0 var(--accent);
+    }
+
+    .sidebar__foot {
+        margin-top: 0;
+        margin-left: auto;
+        border-top: none;
+        padding: 0 8px;
     }
 
     .sb-item__icon,

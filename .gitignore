@@ -27,3 +27,6 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# Accounts, secret key and offline audit entries (created on first run)
+instance/

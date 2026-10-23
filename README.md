@@ -4,7 +4,7 @@ Face recognition, emotion detection and attendance from a webcam.
 
 Take attendance with a webcam. The app finds faces in the camera feed, recognises the people you have registered, and writes down who showed up and when. It also takes a guess at each person's expression. Everything runs on your own computer and you drive it from a browser tab.
 
-This is version 1. It is meant for one PC with one camera, on a network you trust. There is no login yet, so please don't put it on the open internet. The section "What it can't do yet" has the full list.
+This is version 1. It is meant for one PC with one camera, on a network you trust. You have to sign in to use it, but it has not been hardened for the open internet, so please keep it off it. The section "What it can't do yet" has the full list.
 
 ![The Attendance tab showing five sample records](docs/screenshots/attendance.png)
 
@@ -20,7 +20,9 @@ This is version 1. It is meant for one PC with one camera, on a network you trus
 
 **Register.** Capture face images for a new person straight from the camera, then train the recogniser. The new model is picked up without restarting.
 
-**Settings.** Light, dark or system mode, eight colour themes, the database connection, the late cut-off and cooldown, the list of names, and a reset for today's records.
+**Audit log.** Sign-ins, failed sign-ins and every change or delete, with who did it and when. Filter by person, action and date.
+
+**Settings.** Light, dark or system mode, eight colour themes and four fonts (saved to your account), admin accounts, the database connection, the late cut-off and cooldown, the list of names, and a reset for today's records.
 
 ## How it works
 
@@ -49,7 +51,7 @@ pip install -r requirements.txt
 python server.py
 ```
 
-Then open http://localhost:5000.
+Then open http://localhost:5000. The first time, it asks you to create an admin account. There is no default password.
 
 The first start takes a few seconds, because TensorFlow has to load and the app checks which cameras really return a picture.
 
@@ -57,10 +59,11 @@ If MongoDB is not running, the app still starts. You get a "Database offline" ba
 
 ## First run
 
-1. Open **Register**. An ID is suggested for you. Type a name and press **Start Collection**.
-2. Look at the camera and turn your head slowly while it collects images. The default is 500.
-3. Training starts by itself when collection finishes.
-4. Go to **Live Monitor** and press **Start**. Your name should appear on the box around your face, and a record lands on the Attendance tab.
+1. Create your admin account when the page asks for one. More admins can be added later under **Settings**.
+2. Open **Register**. An ID is suggested for you. Type a name and press **Start Collection**.
+3. Look at the camera and turn your head slowly while it collects images. The default is 500.
+4. Training starts by itself when collection finishes.
+5. Go to **Live Monitor** and press **Start**. Your name should appear on the box around your face, and a record lands on the Attendance tab.
 
 ## Settings worth knowing
 
@@ -77,11 +80,12 @@ These are stored in `config.json`, which is created the first time you run the a
 
 ```
 server.py          Flask app: routes, socket handlers, wiring
+auth/              accounts, sign-in and the audit log
 core/              camera loop, detection, image collection, training
 attendance/        attendance rules and Excel/CSV export
 db/                MongoDB wrapper and the optional Firebase mirror
 models/            Haar cascade and the expression model
-web/templates/     the single HTML page
+web/templates/     the app page, plus sign-in and first-run setup
 web/static/        CSS, one JS file per tab, icons
 tests/             test scripts
 docs/              architecture notes and the roadmap
@@ -99,13 +103,13 @@ The tests are plain Python scripts, so there is nothing extra to install. They w
 
 ## Your data
 
-Face images (`ImageData/`), face crops (`snapshots/`), the trained model (`Trainer.yml`) and `config.json` are all listed in `.gitignore`. They stay on your machine. If you fork this, keep it that way: those files are biometric data about real people.
+Face images (`ImageData/`), face crops (`snapshots/`), the trained model (`Trainer.yml`), `config.json` and `instance/` (accounts, the session key and audit entries kept while the database was offline) are all listed in `.gitignore`. They stay on your machine. If you fork this, keep it that way: most of those files are biometric data about real people, and the rest hold your accounts.
 
 Ask people before you register their face.
 
 ## What it can't do yet
 
-- **No login.** Anyone who can reach the page can change settings, delete people and clear records.
+- **Every account is an admin.** There are no read-only accounts yet. Deleting a person or clearing a day asks for your password again, and the **Audit log** tab shows who did what.
 - **Recognition is basic.** LBPH is sensitive to lighting, angle and glasses, and there is no liveness check, so a photo held up to the camera can pass. I have not measured its accuracy.
 - **Expression is a rough guess.** Treat it as a curiosity, not a fact about someone.
 - **Records are per sighting.** A person gets a new row every time the cooldown runs out, not one check-in per day.

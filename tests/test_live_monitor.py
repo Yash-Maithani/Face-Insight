@@ -67,7 +67,6 @@ with open(tmp_cfg_path, "w", encoding="utf-8") as f:
 
 os.environ["FACE_WEB_CONFIG"] = tmp_cfg_path
 
-BASE = "http://127.0.0.1:5000"
 passed = 0
 failed = 0
 
@@ -88,27 +87,39 @@ def section(title):
     print(f"{'=' * 60}")
 
 
-def is_server_running(host="127.0.0.1", port=5000):
+def is_server_running(host, port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.5)
         return s.connect_ex((host, port)) == 0
 
 
-# If server is not already running on port 5000, start it in a daemon thread
-if not is_server_running():
-    import server as srv_module
-    server_thread = threading.Thread(
-        target=lambda: srv_module.socketio.run(
-            srv_module.app, host="127.0.0.1", port=5000,
-            allow_unsafe_werkzeug=True, log_output=False
-        ),
-        daemon=True,
-    )
-    server_thread.start()
-    for _ in range(30):
-        if is_server_running():
-            break
-        time.sleep(0.1)
+def free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+# Always start our own server on a free port with the temporary config, so a
+# server the user has running (with the real config and database) is never used
+import server as srv_module
+from helpers import LiveSession
+
+PORT = free_port()
+BASE = f"http://127.0.0.1:{PORT}"
+server_thread = threading.Thread(
+    target=lambda: srv_module.socketio.run(
+        srv_module.app, host="127.0.0.1", port=PORT,
+        allow_unsafe_werkzeug=True, log_output=False
+    ),
+    daemon=True,
+)
+server_thread.start()
+for _ in range(50):
+    if is_server_running("127.0.0.1", PORT):
+        break
+    time.sleep(0.1)
+
+live = LiveSession(BASE, srv_module)
 
 
 def get(path):
@@ -147,7 +158,7 @@ check("/ returns 200", html_resp.status == 200)
 check("Has Socket.IO CDN", "socket.io" in html.lower())
 _css = open(os.path.join(PROJECT_ROOT, "web", "static", "css", "style.css"), encoding="utf-8").read()
 check("Has IBM Plex Sans font (served by the app)", "font-family: 'IBM Plex Sans'" in _css)
-check("Has 5 tabs", html.count('data-tab=') == 5)
+check("Has 6 tabs", html.count('data-tab=') == 6)
 
 # WebSocket test
 import socketio as sio_module
@@ -160,7 +171,7 @@ sio.on("stats:update", lambda d: ws_events.append(("stats:update", d)))
 sio.on("collect:status", lambda d: ws_events.append(("collect:status", d)))
 sio.on("train:status", lambda d: ws_events.append(("train:status", d)))
 
-sio.connect(BASE, transports=["websocket"])
+sio.connect(BASE, transports=["websocket"], headers=live.socket_headers)
 time.sleep(2)
 sio.disconnect()
 
@@ -211,7 +222,7 @@ original_threshold = cfg_before.get("confidence_threshold", 60)
 
 # Send threshold change via Socket.IO
 sio2 = sio_module.Client()
-sio2.connect(BASE, transports=["websocket"])
+sio2.connect(BASE, transports=["websocket"], headers=live.socket_headers)
 sio2.emit("settings:threshold", {"value": 85})
 time.sleep(1)
 sio2.disconnect()
@@ -221,7 +232,7 @@ check("Threshold updated to 85", cfg_after.get("confidence_threshold") == 85)
 
 # Restore
 sio3 = sio_module.Client()
-sio3.connect(BASE, transports=["websocket"])
+sio3.connect(BASE, transports=["websocket"], headers=live.socket_headers)
 sio3.emit("settings:threshold", {"value": original_threshold})
 time.sleep(0.5)
 sio3.disconnect()
@@ -240,7 +251,7 @@ time.sleep(1)
 sio4 = sio_module.Client()
 reconnect_events = []
 sio4.on("camera:status", lambda d: reconnect_events.append(d))
-sio4.connect(BASE, transports=["websocket"])
+sio4.connect(BASE, transports=["websocket"], headers=live.socket_headers)
 time.sleep(1)
 sio4.disconnect()
 

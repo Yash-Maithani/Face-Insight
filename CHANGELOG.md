@@ -2,6 +2,24 @@
 
 All notable changes to Face Insight.
 
+## Unreleased (version 2, in progress)
+
+### Accounts and sign-in
+- Every page, API route and live connection needs a signed-in admin. The first start asks you to create one; there is no default password.
+- Admins can add other admins and change their own password from Settings.
+- Five wrong passwords within ten minutes lock that username out for a minute.
+- Deleting a person, clearing today and adding an admin ask for the password again if it was not typed in the last 15 minutes.
+- The database password is no longer sent to the browser.
+
+### Audit log
+- A new tab lists sign-ins, failed sign-ins and every change or delete, with who did it and when. Filter by person, action and date.
+- Entries made while the database is offline are kept in a local file and still shown.
+
+### Interface
+- A sidebar instead of top tabs, and a status bar for the camera, database and connection.
+- Mode, colour theme and font are saved to your account. Four fonts to pick from.
+- Chart.js, Socket.IO and the fonts are served by the app, so it works without internet.
+
 ## 1.0.0 (2026-10-08)
 
 First tagged version.

@@ -73,7 +73,8 @@ def section(title):
 test_db = MongoAttendanceDB("mongodb://localhost:27017", "face_attendance_test")
 server.mongo_db = test_db
 server.engine._db = test_db
-client = server.app.test_client()
+from helpers import signed_in_client, socket_client  # noqa: E402
+client = signed_in_client(server)
 mongo_available = test_db.is_connected
 
 TEST_NAME = "P7 Range Tester"
@@ -165,7 +166,7 @@ else:
 # ──────────────────────────────────────────────────────────────────────────
 section("3. Live settings events acknowledge the save")
 
-sio = server.socketio.test_client(server.app)
+sio = socket_client(server, client)
 
 ack = sio.emit("settings:threshold", {"value": 72}, callback=True)
 check("Valid threshold is acknowledged ok", isinstance(ack, dict) and ack.get("ok") is True, str(ack))

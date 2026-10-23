@@ -16,6 +16,7 @@ import shutil
 
 import cv2
 from flask import Flask, Response, jsonify, request, render_template, send_file, after_this_request
+from flask_login import current_user
 from flask_socketio import SocketIO, emit
 
 # Project imports
@@ -31,6 +32,9 @@ from attendance.exporter import export_to_excel, export_to_csv
 from core.detector import Detector, recognizer_lock
 from core.collector import DataCollector
 from core.trainer import ModelTrainer
+from auth.audit import AuditLog
+from auth.store import UserStore, prefs_of
+from auth.web import fresh_required, init_auth, load_secret_key
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -61,6 +65,12 @@ def _detect_cameras(max_index=3):
 # ── Bootstrap ─────────────────────────────────────────────────────────────────
 cfg = load_config()
 
+# Local, never-committed files (accounts, secret key, offline audit entries)
+# live next to the config file in use, so tests with a temporary config get
+# their own instance folder automatically.
+CONFIG_FILE = os.path.abspath(os.environ.get("FACE_WEB_CONFIG", CONFIG_PATH))
+INSTANCE_DIR = os.path.join(os.path.dirname(CONFIG_FILE), "instance")
+
 # Models
 cascade = load_haar_cascade()
 recognizer, recognizer_ready = load_recognizer(cfg["trainer_file"])
@@ -90,8 +100,14 @@ app = Flask(
     template_folder=os.path.join("web", "templates"),
     static_folder=os.path.join("web", "static"),
 )
-app.config["SECRET_KEY"] = "face-attendance-secret"
-socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
+app.config["SECRET_KEY"] = load_secret_key(INSTANCE_DIR)
+# Same-origin only (the default): other sites cannot open a socket to this app
+socketio = SocketIO(app, async_mode="threading")
+
+# Accounts, the sign-in gate and the audit log
+users = UserStore(INSTANCE_DIR)
+audit_log = AuditLog(lambda: mongo_db, INSTANCE_DIR)
+audit_event = init_auth(app, users, audit_log)
 
 # Detector
 detector = Detector(cfg, models, engine, socketio)
@@ -136,7 +152,7 @@ def inject_asset_version():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", me=current_user.username, prefs=prefs_of(current_user.record))
 
 
 @app.route("/video_feed")
@@ -161,6 +177,7 @@ def camera_start():
     cam_index = data.get("cam_index", 0)
     detector.start(cam_index)
     # camera:status is emitted inside detector.start()
+    audit_event("camera.started", target=f"camera {cam_index}")
     return jsonify({"ok": True})
 
 
@@ -168,6 +185,7 @@ def camera_start():
 def camera_stop():
     detector.stop()
     # camera:status is emitted inside detector.stop()
+    audit_event("camera.stopped")
     return jsonify({"ok": True})
 
 
@@ -231,10 +249,15 @@ def attendance_delete(record_id):
     _remove_snapshot(record["id"])
     engine.forget_record(record)
     _announce_deleted([record["id"]], record.get("date"))
+    audit_event("attendance.deleted", target=record["id"], details={
+        "name": record.get("name"), "status": record.get("status"),
+        "date": record.get("date"), "time_in": record.get("time_in"),
+    })
     return jsonify({"ok": True, "deleted": 1, "id": record["id"]})
 
 
 @app.route("/api/attendance", methods=["DELETE"])
+@fresh_required
 def attendance_delete_today():
     """Delete every record dated today, their snapshots, and all cooldowns.
 
@@ -256,6 +279,7 @@ def attendance_delete_today():
         _remove_snapshot(rid)
     engine.reset_cooldowns()
     _announce_deleted(ids, today)
+    audit_event("attendance.cleared_today", target=today, details={"deleted": len(ids)})
     logger.info("Cleared %d attendance record(s) for %s", len(ids), today)
     return jsonify({"ok": True, "deleted": len(ids), "date": today})
 
@@ -287,6 +311,9 @@ def attendance_manual():
 
     socketio.emit("attendance:new", clean)
     socketio.emit("stats:update", _stats_payload())
+    audit_event("attendance.manual_mark", target=clean.get("id"), details={
+        "person_id": person_id, "name": name, "status": status,
+    })
 
     return jsonify({"ok": True, "record": clean})
 
@@ -394,6 +421,7 @@ def db_reconnect():
     connected = mongo_db.is_connected
     if connected:
         socketio.emit("stats:update", _stats_payload())
+    audit_event("db.reconnect", details={"connected": connected})
     return jsonify({"ok": connected, "db_connected": connected})
 
 
@@ -505,6 +533,8 @@ def _validate_config(data: dict, current: dict):
 @app.route("/api/config", methods=["GET"])
 def config_get():
     current = load_config()
+    # The page gets the URI with any password replaced by ***
+    current["mongodb_uri"] = mask_mongo_uri(current.get("mongodb_uri", ""))
     return jsonify(current)
 
 
@@ -544,6 +574,18 @@ def config_post():
     old_db = current.get("mongodb_db")
     old_fb_url = current.get("firebase_url")
     old_fb_cred = current.get("firebase_credentials")
+
+    # The page only ever saw the masked URI. Sending it back unchanged means
+    # "keep the stored one", password included.
+    if "mongodb_uri" in data and "***" in str(data["mongodb_uri"]) \
+            and data["mongodb_uri"] == mask_mongo_uri(old_uri or ""):
+        data["mongodb_uri"] = old_uri
+
+    # What changed, for the audit log. Secret values are never recorded.
+    changed = sorted(k for k, v in data.items() if k != "attendance" and current.get(k) != v)
+    if isinstance(data.get("attendance"), dict):
+        changed += sorted("attendance." + k for k, v in data["attendance"].items()
+                          if current.get("attendance", {}).get(k) != v)
 
     if "attendance" in data and isinstance(data["attendance"], dict):
         current.setdefault("attendance", {}).update(data["attendance"])
@@ -585,6 +627,10 @@ def config_post():
         except Exception as exc:
             logger.warning("Firebase rebuild error: %s", exc)
 
+    audit_event("settings.saved", details={"changed": changed})
+
+    current = dict(current)
+    current["mongodb_uri"] = mask_mongo_uri(current.get("mongodb_uri", ""))
     resp = {"ok": True, "config": current}
     if warning:
         resp["warning"] = warning
@@ -664,6 +710,7 @@ def collect_start():
     current.setdefault("names", {})[str(person_id)] = name
     save_config(current)
     detector.update_names(current["names"])
+    audit_event("collection.started", target=person_id, details={"name": name, "max_images": max_images})
 
     return jsonify({"ok": True, "status": collector.get_status()})
 
@@ -711,6 +758,7 @@ def train_start():
     current = load_config()
     detector.update_names(current.get("names", {}))
     engine.set_names(build_names(current))
+    audit_event("training.started")
 
     return jsonify({"ok": True})
 
@@ -755,6 +803,7 @@ def persons_list():
 
 
 @app.route("/api/persons/<int:person_id>", methods=["DELETE"])
+@fresh_required
 def persons_delete(person_id):
     """Delete a person: remove flat images, remove from config, retrain."""
     current = load_config()
@@ -764,8 +813,9 @@ def persons_delete(person_id):
         return jsonify({"error": "Person not found"}), 404
 
     # Remove from config
-    del current["names"][pid_str]
+    removed_name = current["names"].pop(pid_str)
     save_config(current)
+    audit_event("person.deleted", target=person_id, details={"name": removed_name})
     detector.update_names(current["names"])
     engine.set_names(build_names(current))
 
@@ -787,7 +837,7 @@ def persons_delete(person_id):
     if remaining_names:
         trainer.start()
     else:
-        # No persons left — delete Trainer.yml and mark recognizer as unready.
+        # No persons left: delete Trainer.yml and mark recognizer as unready.
         # Do NOT replace the recognizer object (the detector holds a reference).
         trainer_path = os.path.join(project_root, current.get("trainer_file", "Trainer.yml"))
         if os.path.exists(trainer_path):
@@ -805,7 +855,9 @@ def persons_delete(person_id):
 
 @socketio.on("connect")
 def handle_connect():
-    """On every client connect, send current state."""
+    """On every client connect, send current state. Refuse anyone not signed in."""
+    if not current_user.is_authenticated:
+        return False
     emit("camera:status", {
         "running": detector.is_running,
         "cam_index": detector._cam_index,
@@ -825,8 +877,10 @@ def handle_threshold(data):
     detector.update_threshold(value)
     # Persist
     current = load_config()
+    old_value = current.get("confidence_threshold")
     current["confidence_threshold"] = value
     save_config(current)
+    audit_event("settings.threshold", details={"from": old_value, "to": value})
     logger.info("Threshold updated to %s", value)
     return {"ok": True, "value": value}
 
@@ -842,6 +896,7 @@ def handle_auto_attend(data):
     current = load_config()
     current.setdefault("attendance", {})["auto_attend"] = enabled
     save_config(current)
+    audit_event("settings.auto_attend", details={"enabled": enabled})
     logger.info("Auto-attend set to %s", enabled)
     return {"ok": True, "enabled": enabled}
 

@@ -1,0 +1,25 @@
+    <script>
+        // Apply mode, colour theme and font before first paint, so the page
+        // never flashes the wrong look. Signed in: the account's saved
+        // choices (rendered by the server). Signed out: the last ones used in
+        // this browser.
+        (function () {
+            var root = document.documentElement;
+            var prefs = {{ (prefs or {}) | tojson }};
+            var stored = {};
+            try {
+                stored = {
+                    mode: localStorage.getItem("fa-mode"),
+                    theme: localStorage.getItem("fa-theme"),
+                    font: localStorage.getItem("fa-font")
+                };
+            } catch (e) {}
+            var mode = prefs.mode || stored.mode || "dark";
+            var dark = mode === "dark" ||
+                (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+            root.dataset.prefMode = mode;
+            root.dataset.mode = dark ? "dark" : "light";
+            root.dataset.theme = prefs.theme || stored.theme || "orange";
+            root.dataset.font = prefs.font || stored.font || "plex";
+        })();
+    </script>

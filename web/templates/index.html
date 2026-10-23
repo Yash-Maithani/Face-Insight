@@ -8,22 +8,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png?v={{ asset_v }}">
     <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico?v={{ asset_v }}">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/img/apple-touch-icon.png?v={{ asset_v }}">
-    <script>
-        // Apply the saved mode and color theme before first paint.
-        (function () {
-            var root = document.documentElement;
-            var mode = "dark";
-            var theme = "orange";
-            try {
-                mode = localStorage.getItem("fa-mode") || mode;
-                theme = localStorage.getItem("fa-theme") || theme;
-            } catch (e) {}
-            var dark = mode === "dark" ||
-                (mode !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-            root.dataset.mode = dark ? "dark" : "light";
-            root.dataset.theme = theme;
-        })();
-    </script>
+    {% include "_prepaint.html" %}
     <link rel="stylesheet" href="/static/css/style.css?v={{ asset_v }}">
 </head>
 <body>
@@ -57,7 +42,24 @@
                 <svg class="tab-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg>
                 <span class="tab-btn__label">Settings</span>
             </button>
+            <button class="tab-btn" data-tab="audit" role="tab" aria-selected="false" aria-controls="panel-audit" title="Audit log">
+                <svg class="tab-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+                <span class="tab-btn__label">Audit log</span>
+            </button>
         </nav>
+
+        <div class="sidebar__foot">
+            <span class="sidebar__user" title="Signed in as {{ me }}">
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+                <span class="sidebar__user-name" id="currentUser">{{ me }}</span>
+            </span>
+            <form class="sidebar__logout" method="post" action="/logout">
+                <button type="submit" class="btn btn--ghost btn--sm" title="Log out {{ me }}" aria-label="Log out {{ me }}">
+                    <svg class="btn__icon" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
+                    <span class="btn__label">Log out</span>
+                </button>
+            </form>
+        </div>
     </aside>
 
     <div class="shell__main">
@@ -588,14 +590,14 @@
         <section class="panel" id="panel-settings" role="tabpanel" aria-labelledby="title-settings">
             <div class="panel-head">
                 <h2 class="panel-title" id="title-settings">Settings</h2>
-                <p class="panel-sub">Appearance, database, attendance rules and names.</p>
+                <p class="panel-sub">Appearance, accounts, database, attendance rules and names.</p>
             </div>
             <div class="settings-grid">
                 <!-- Appearance -->
                 <div class="card settings-appearance-card">
                     <div class="card__header">
                         <h3 class="card__title">Appearance</h3>
-                        <span class="card__badge-sub">Saved in this browser. Applies immediately.</span>
+                        <span class="card__badge-sub">Saved to your account. Applies immediately.</span>
                     </div>
                     <div class="appearance-body">
                         <div class="appearance-group">
@@ -632,6 +634,23 @@
                                 </button>
                                 <button type="button" class="theme-swatch" data-theme-option="steel" aria-pressed="false">
                                     <span class="theme-swatch__chip"></span>Steel
+                                </button>
+                            </div>
+                        </div>
+                        <div class="appearance-group">
+                            <span class="form-label" id="appearanceFontLabel">Font</span>
+                            <div class="theme-grid" id="fontGrid" role="group" aria-labelledby="appearanceFontLabel">
+                                <button type="button" class="theme-swatch font-swatch" data-font-option="plex" aria-pressed="false">
+                                    <span class="font-swatch__sample">Aa 0123</span>IBM Plex Sans
+                                </button>
+                                <button type="button" class="theme-swatch font-swatch" data-font-option="source" aria-pressed="false">
+                                    <span class="font-swatch__sample">Aa 0123</span>Source Sans 3
+                                </button>
+                                <button type="button" class="theme-swatch font-swatch" data-font-option="atkinson" aria-pressed="false">
+                                    <span class="font-swatch__sample">Aa 0123</span>Atkinson Hyperlegible
+                                </button>
+                                <button type="button" class="theme-swatch font-swatch" data-font-option="inter" aria-pressed="false">
+                                    <span class="font-swatch__sample">Aa 0123</span>Inter
                                 </button>
                             </div>
                         </div>
@@ -740,6 +759,60 @@
                     </div>
                 </div>
 
+                <!-- Accounts -->
+                <div class="card settings-accounts-card">
+                    <div class="card__header">
+                        <h3 class="card__title">Accounts</h3>
+                        <span class="card__badge-sub">Every account is an admin.</span>
+                    </div>
+                    <div class="accounts-body">
+                        <div>
+                            <h4>Admins</h4>
+                            <div class="table-responsive">
+                                <table class="data-table" id="usersTable">
+                                    <thead>
+                                        <tr><th>Username</th><th>Last sign-in</th></tr>
+                                    </thead>
+                                    <tbody id="usersTableBody">
+                                        <tr><td colspan="2" class="table-empty"></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <form class="accounts-form" id="addUserForm" autocomplete="off">
+                            <h4>Add an admin</h4>
+                            <div class="form-group">
+                                <label for="newUserName" class="form-label">Username</label>
+                                <input id="newUserName" class="form-input" autocomplete="off" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="newUserPassword" class="form-label">Password</label>
+                                <input id="newUserPassword" type="password" class="form-input" autocomplete="new-password" required minlength="8">
+                                <p class="form-hint">At least 8 characters. Share it with them in person.</p>
+                            </div>
+                            <span class="field-error" id="errAddUser" role="alert"></span>
+                            <button type="submit" class="btn btn--ghost">Add admin</button>
+                        </form>
+                        <form class="accounts-form" id="passwordForm" autocomplete="off">
+                            <h4>Change your password</h4>
+                            <div class="form-group">
+                                <label for="pwCurrent" class="form-label">Current password</label>
+                                <input id="pwCurrent" type="password" class="form-input" autocomplete="current-password" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="pwNew" class="form-label">New password</label>
+                                <input id="pwNew" type="password" class="form-input" autocomplete="new-password" required minlength="8">
+                            </div>
+                            <div class="form-group">
+                                <label for="pwConfirm" class="form-label">New password again</label>
+                                <input id="pwConfirm" type="password" class="form-input" autocomplete="new-password" required minlength="8">
+                            </div>
+                            <span class="field-error" id="errPassword" role="alert"></span>
+                            <button type="submit" class="btn btn--ghost">Change password</button>
+                        </form>
+                    </div>
+                </div>
+
                 <!-- Danger zone: actions that delete data -->
                 <div class="card settings-danger-card">
                     <div class="card__header">
@@ -763,6 +836,47 @@
                 </button>
                 <button type="button" class="btn btn--ghost" id="btnDiscardSettings" hidden>Discard changes</button>
                 <span class="settings-save-status" id="settingsSaveStatus" role="status"></span>
+            </div>
+        </section>
+
+        <!-- Audit log -->
+        <section class="panel" id="panel-audit" role="tabpanel" aria-labelledby="title-audit">
+            <div class="panel-head">
+                <h2 class="panel-title" id="title-audit">Audit log</h2>
+                <p class="panel-sub">Who signed in, and who changed or deleted what.</p>
+            </div>
+            <div class="panel-header-row">
+                <div class="audit-filters">
+                    <div class="form-group">
+                        <label for="auditUser" class="form-label">User</label>
+                        <select id="auditUser" class="input-select form-input"><option value="">Everyone</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="auditAction" class="form-label">Action</label>
+                        <select id="auditAction" class="input-select form-input"><option value="">All actions</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="auditFrom" class="form-label">From</label>
+                        <input type="date" id="auditFrom" class="input-date form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="auditTo" class="form-label">To</label>
+                        <input type="date" id="auditTo" class="input-date form-input">
+                    </div>
+                    <button type="button" class="btn btn--ghost" id="btnAuditReset">Reset</button>
+                </div>
+            </div>
+            <div class="card table-card">
+                <p class="audit-note" id="auditNote" hidden></p>
+                <div class="table-responsive">
+                    <table class="data-table data-table--stack audit-table" id="auditTable" hidden>
+                        <thead>
+                            <tr><th>Time</th><th>User</th><th>Action</th><th>Target</th><th>Details</th></tr>
+                        </thead>
+                        <tbody id="auditTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="table-empty" id="auditEmpty"></div>
             </div>
         </section>
 
@@ -802,5 +916,6 @@
     <script src="/static/js/dashboard.js?v={{ asset_v }}"></script>
     <script src="/static/js/register.js?v={{ asset_v }}"></script>
     <script src="/static/js/settings.js?v={{ asset_v }}"></script>
+    <script src="/static/js/audit.js?v={{ asset_v }}"></script>
 </body>
 </html>

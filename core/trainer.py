@@ -42,7 +42,7 @@ class ModelTrainer:
         ``models["recognizer"].read(trainer_path)`` is called *in place*
         and ``models["recognizer_ready"]`` is set to True.
     recognizer_lock : threading.Lock
-        Shared lock with the detector — held while calling
+        Shared lock with the detector, held while calling
         recognizer.read() so predict() cannot race with it.
     socketio : SocketIO
         For emitting training progress events.
@@ -71,7 +71,7 @@ class ModelTrainer:
         Parameters
         ----------
         on_done : callable, optional
-            Called (no args) after training finishes — whether it
+            Called (no args) after training finishes, whether it
             succeeded or failed.  Used by server.py to resume the LM.
 
         Returns (True, None) if started, (False, error_string) if busy.

@@ -71,7 +71,8 @@ BAD_URI = "mongodb://localhost:29999"
 test_db = MongoAttendanceDB(GOOD_URI, "face_attendance_test")
 server.mongo_db = test_db
 server.engine._db = test_db
-client = server.app.test_client()
+from helpers import signed_in_client  # noqa: E402
+client = signed_in_client(server)
 mongo_available = test_db.is_connected
 
 # ──────────────────────────────────────────────────────────────────────────

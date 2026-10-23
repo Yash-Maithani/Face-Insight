@@ -232,7 +232,8 @@
         if (!confirmed) return;
 
         try {
-            const res = await fetch(`/api/persons/${id}`, { method: "DELETE" });
+            const res = await window.App.fetchFresh(`/api/persons/${id}`, { method: "DELETE" });
+            if (!res) return; // password not confirmed
             const data = await res.json();
             if (!res.ok) {
                 window.App.showToast(data.error || "Failed to delete person", "error");

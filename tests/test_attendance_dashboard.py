@@ -81,7 +81,8 @@ server.engine._db = test_db
 if test_db.is_connected:
     test_db._collection.delete_many({})
 
-client = server.app.test_client()
+from helpers import signed_in_client  # noqa: E402
+client = signed_in_client(server)
 
 # ── 1. Seed records & Verify Listing / Counts ────────────────────────
 section("1. Seed records (Present, Late, Unknown) & Verify Listing / Counts")

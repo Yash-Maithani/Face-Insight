@@ -377,7 +377,7 @@ t_hrl._data_folder  = tmp_hrl
 t_hrl._trainer_file = tmp_hrl_yml
 t_hrl._do_train()
 
-# Consumer held reference to the original object — it must be the SAME object
+# Consumer held reference to the original object: it must be the SAME object
 check("Consumer still holds same object after training",
       consumer_recognizer_ref is shared_models["recognizer"])
 check("recognizer_ready is True", shared_models["recognizer_ready"])
@@ -400,7 +400,7 @@ shutil.rmtree(tmp_hrl)
 section("6. Failed training: emits train:error, calls on_done, does not raise")
 
 tmp_empty = tempfile.mkdtemp(prefix="face_empty_")
-# Empty folder — no images
+# Empty folder: no images
 models_e  = {"recognizer": cv2.face.LBPHFaceRecognizer_create(), "recognizer_ready": False}
 sio_e     = MagicMock()
 on_done_called = [False]
@@ -453,7 +453,8 @@ section("8. Server routes: validation + persons")
 os.environ.setdefault("TESTING", "1")
 import server as srv
 
-client = srv.app.test_client()
+from helpers import signed_in_client  # noqa: E402
+client = signed_in_client(srv)
 
 # 8a. collect/start: bad person_id types
 resp = client.post("/api/collect/start", json={"name": "Alice"})
@@ -592,7 +593,7 @@ with _patch("server.save_config", side_effect=_fake_save_config), \
     check("Person 56 files untouched", len(_flat_images(tmp_del, 56)) == 4)
     check("trainer.start() called (retrain)", mock_train_start.called)
 
-# Now delete the last person — should reset recognizer_ready, not crash
+# Now delete the last person: should reset recognizer_ready, not crash
 srv.cfg["names"] = {"56": "OtherPerson"}  # 56 is the only one
 
 with _patch("server.save_config", side_effect=_fake_save_config), \
@@ -661,7 +662,10 @@ if ws_available:
     time.sleep(2)
 
     try:
-        sio_client.connect(f"http://127.0.0.1:{port}", transports=["websocket"])
+        from helpers import LiveSession
+        live = LiveSession(f"http://127.0.0.1:{port}", srv)
+        sio_client.connect(f"http://127.0.0.1:{port}", transports=["websocket"],
+                           headers=live.socket_headers)
         time.sleep(1)
 
         cs = received.get("collect:status", {})
@@ -840,7 +844,7 @@ shutil.rmtree(tmp_14d)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  15. Real camera collection — saves exactly max_images files
+#  15. Real camera collection: saves exactly max_images files
 # ─────────────────────────────────────────────────────────────────────────────
 section("15. Real camera collection (skipped if no camera or no face visible)")
 

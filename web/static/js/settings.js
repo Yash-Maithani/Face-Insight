@@ -96,9 +96,10 @@
         }
     });
 
-    // ── Appearance (mode + color theme, stored per browser) ──────────────
+    // ── Appearance (mode, colour theme, font; saved to the account) ──────
     const modeButtons = document.querySelectorAll("[data-mode-option]");
     const themeButtons = document.querySelectorAll("[data-theme-option]");
+    const fontButtons = document.querySelectorAll("[data-font-option]");
 
     function syncAppearance() {
         const theme = window.App.theme;
@@ -108,6 +109,9 @@
         themeButtons.forEach((btn) => {
             btn.setAttribute("aria-pressed", String(btn.dataset.themeOption === theme.getColor()));
         });
+        fontButtons.forEach((btn) => {
+            btn.setAttribute("aria-pressed", String(btn.dataset.fontOption === theme.getFont()));
+        });
     }
 
     modeButtons.forEach((btn) => {
@@ -116,6 +120,108 @@
     themeButtons.forEach((btn) => {
         btn.addEventListener("click", () => window.App.theme.setColor(btn.dataset.themeOption));
     });
+    fontButtons.forEach((btn) => {
+        btn.addEventListener("click", () => window.App.theme.setFont(btn.dataset.fontOption));
+    });
+
+    // ── Accounts ─────────────────────────────────────────────────────────
+    const usersTableBody = document.getElementById("usersTableBody");
+    const addUserForm = document.getElementById("addUserForm");
+    const passwordForm = document.getElementById("passwordForm");
+    const errAddUser = document.getElementById("errAddUser");
+    const errPassword = document.getElementById("errPassword");
+
+    function emptyRow() {
+        usersTableBody.innerHTML = `<tr><td colspan="2" class="table-empty"></td></tr>`;
+        return usersTableBody.querySelector("td");
+    }
+
+    function renderUsers(list) {
+        if (!list.length) {
+            window.App.renderState(emptyRow(), "empty", "No accounts.");
+            return;
+        }
+        usersTableBody.innerHTML = list
+            .map((u) => `
+                <tr>
+                    <td>${window.App.escapeHtml(u.username)}</td>
+                    <td class="mono">${u.last_login ? window.App.escapeHtml(u.last_login.replace("T", " ")) : "Never"}</td>
+                </tr>`)
+            .join("");
+    }
+
+    async function loadUsers() {
+        window.App.renderState(emptyRow(), "loading", "Loading...");
+        try {
+            const res = await fetch("/api/users");
+            if (!res.ok) throw new Error("users");
+            renderUsers(await res.json());
+        } catch (err) {
+            window.App.renderState(emptyRow(), "error", "Could not load accounts.", loadUsers);
+        }
+    }
+
+    addUserForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errAddUser.textContent = "";
+        const username = document.getElementById("newUserName").value.trim();
+        const password = document.getElementById("newUserPassword").value;
+        const submit = addUserForm.querySelector('button[type="submit"]');
+        submit.disabled = true;
+        try {
+            const res = await window.App.fetchFresh("/api/users", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password }),
+            });
+            if (!res) return; // password not confirmed
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                errAddUser.textContent = data.error || "The account could not be added.";
+                return;
+            }
+            addUserForm.reset();
+            renderUsers(data.users || []);
+            window.App.showToast(`Added ${username}. They can sign in now.`, "success");
+        } catch (err) {
+            errAddUser.textContent = "Could not reach the server.";
+        } finally {
+            submit.disabled = false;
+        }
+    });
+
+    passwordForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errPassword.textContent = "";
+        const current = document.getElementById("pwCurrent").value;
+        const next = document.getElementById("pwNew").value;
+        if (next !== document.getElementById("pwConfirm").value) {
+            errPassword.textContent = "The two new passwords do not match.";
+            return;
+        }
+        const submit = passwordForm.querySelector('button[type="submit"]');
+        submit.disabled = true;
+        try {
+            const res = await fetch("/api/auth/password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ current, new: next }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                errPassword.textContent = data.error || "The password was not changed.";
+                return;
+            }
+            passwordForm.reset();
+            window.App.showToast("Password changed.", "success");
+        } catch (err) {
+            errPassword.textContent = "Could not reach the server.";
+        } finally {
+            submit.disabled = false;
+        }
+    });
+
+    loadUsers();
 
     window.addEventListener("themechange", syncAppearance);
     syncAppearance();
@@ -408,7 +514,8 @@
         });
         if (!confirmed) return;
 
-        const res = await fetch(`/api/attendance?date=${encodeURIComponent(today)}`, { method: "DELETE" });
+        const res = await window.App.fetchFresh(`/api/attendance?date=${encodeURIComponent(today)}`, { method: "DELETE" });
+        if (!res) return; // password not confirmed
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
             window.App.showToast(data.error || "Today's records could not be deleted", "error");

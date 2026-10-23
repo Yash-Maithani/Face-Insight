@@ -12,11 +12,14 @@
 | `core/camera_utils.py` | Picks the camera backend for the operating system. |
 | `attendance/engine.py` | Decides whether a sighting becomes a record: cooldown, Present, Late or Unknown, and manual marks. |
 | `attendance/exporter.py` | Excel and CSV export. |
-| `db/mongo_client.py` | A thin wrapper around one collection, `attendance_logs`. |
+| `auth/store.py` | Admin accounts in `instance/users.json`, bcrypt password hashes, and the sign-in throttle. |
+| `auth/audit.py` | The audit log: writes to MongoDB, or to `instance/audit-offline.jsonl` while it is down. |
+| `auth/web.py` | The sign-in gate in front of every route, the sign-in and setup pages, and the account APIs. |
+| `db/mongo_client.py` | A thin wrapper around two collections, `attendance_logs` and `audit_log`. |
 | `db/firebase_client.py` | Optional mirror to Firebase. Does nothing unless it is configured. |
-| `web/templates/index.html` | The one page. |
+| `web/templates/index.html` | The app page. `login.html` and `setup.html` are the only others. |
 | `web/static/js/app.js` | Shared code: socket, theme, URL handling, dialogs, toasts, and the Live Monitor tab. |
-| `web/static/js/*.js` | One file each for Attendance, Dashboard, Register and Settings. |
+| `web/static/js/*.js` | One file each for Attendance, Dashboard, Register, Settings and the Audit log. |
 | `web/static/css/style.css` | All the styles. The colour tokens are at the top. |
 
 ## What happens to a frame
@@ -44,11 +47,31 @@ The app is meant to keep running when optional parts are absent:
 
 The one thing that stops startup is a missing expression model, and the error names the path it looked in.
 
+## Signing in
+
+Every route needs a signed-in admin, apart from `/login`, `/setup` and static files. A page request without a session is sent to `/login`; an API request gets `401` with `{"login_required": true}`. Socket.IO connections without a session are refused.
+
+- While no account exists, everything leads to `/setup`, which creates the first admin. After that it is closed.
+- Accounts are kept in a JSON file, not in MongoDB, so you can still sign in and fix the database settings while it is down.
+- Five wrong passwords for one username from one address lock that pair out for a minute.
+- Deleting a person, clearing today and adding an admin need the password typed in the last 15 minutes. Otherwise the server answers `403` with `{"fresh_required": true}`, and the page asks for the password and tries again.
+- Sessions last 12 hours. The session key is generated on first start and kept in `instance/secret_key`, or set with `FACE_WEB_SECRET_KEY`.
+
 ## HTTP routes
 
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/` | The page |
+| GET, POST | `/login` | Sign in. `next` must be a path on this site. |
+| POST | `/logout` | Sign out |
+| GET, POST | `/setup` | Create the first admin (only while there is none) |
+| GET | `/api/me` | The signed-in username and saved appearance |
+| PUT | `/api/me/preferences` `{mode, theme, font}` | Save any of the three |
+| POST | `/api/auth/confirm` `{password}` | Confirm the password before a destructive action |
+| POST | `/api/auth/password` `{current, new}` | Change your password |
+| GET | `/api/users` | Admin accounts, without password hashes |
+| POST | `/api/users` `{username, password}` | Add an admin |
+| GET | `/api/audit?user=&action=&from=&to=&limit=` | Audit entries, newest first, with the total and `db_available` |
 | GET | `/video_feed` | MJPEG stream for the Live Monitor |
 | GET | `/api/camera/list` | Camera indexes that returned a real frame at startup |
 | POST | `/api/camera/start` `{cam_index}` | Start the Live Monitor |
@@ -109,7 +132,8 @@ Anything the app does not recognise falls back to the default, and the URL is co
 - `App.socket` is the one Socket.IO connection.
 - `App.theme`, `App.route` and `App.db` hold the theme, the URL and the database status.
 - `App.showToast`, `App.confirm`, `App.trapFocus` and `App.download` cover messages, dialogs and file downloads.
-- `App.setKpi` and `App.staggerIn` are the only two animations.
+- `App.fetchFresh` runs a request that may need the password again, and returns `null` if the person cancels.
+- Any `401` from the API sends the page to the sign-in page.
 
 Tabs talk to each other through events on `window`: `tab:navigate`, `route:change`, `themechange`, `db:status` and `threshold:change`.
 
@@ -123,9 +147,10 @@ Two attributes on `<html>` pick the look:
 
 - `data-mode` is `light` or `dark`. The System option follows the operating system.
 - `data-theme` is one of `orange` (the default), `ink`, `teal`, `blue`, `navy`, `olive`, `coffee` or `steel`.
+- `data-font` is one of `plex` (IBM Plex Sans, the default), `source` (Source Sans 3), `atkinson` (Atkinson Hyperlegible) or `inter`.
 
 Green, amber and red are not offered as themes, because they already mean Present, Late and Unknown.
 
-The choice is stored in the browser and applied by a short inline script before the first paint, so the page does not flash the wrong theme.
+The choices are saved to the account and also kept in the browser. A short inline script applies them before the first paint, so the page does not flash the wrong look. The sign-in page, which has no account yet, uses the browser's copy.
 
 House rules for the interface: flat surfaces with a one pixel border, small corner radii, no gradients, no blur, no decorative animation, and plain wording.

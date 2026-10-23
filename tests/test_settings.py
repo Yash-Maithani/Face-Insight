@@ -49,7 +49,8 @@ os.environ["FACE_WEB_CONFIG"] = tmp_cfg_file
 os.environ.setdefault("TESTING", "1")
 
 import server as srv
-client = srv.app.test_client()
+from helpers import signed_in_client  # noqa: E402
+client = signed_in_client(srv)
 
 passed = 0
 failed = 0

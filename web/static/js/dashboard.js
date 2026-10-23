@@ -17,7 +17,7 @@
         if (!window.Chart) return;
         Chart.defaults.color = cssVar("--text-dim");
         Chart.defaults.borderColor = cssVar("--border");
-        Chart.defaults.font.family = "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif";
+        Chart.defaults.font.family = cssVar("--font-sans");
     }
 
     applyChartDefaults();

@@ -48,7 +48,7 @@ def load_config(path: str = None) -> dict:
     if path is None:
         path = os.environ.get("FACE_WEB_CONFIG", CONFIG_PATH)
     if not os.path.exists(path):
-        logger.info("config.json not found – creating with defaults at %s", path)
+        logger.info("config.json not found: creating with defaults at %s", path)
         save_config(DEFAULT_CONFIG, path)
         return dict(DEFAULT_CONFIG)  # shallow copy of top-level
     with open(path, "r", encoding="utf-8") as f:
@@ -102,7 +102,7 @@ def load_recognizer(trainer_path: str):
 
     Returns (recognizer, recognizer_ready).
     If Trainer.yml is missing the recognizer is returned *uninitialized*
-    and recognizer_ready is False – every face will be treated as Unknown
+    and recognizer_ready is False: every face will be treated as Unknown
     until the first successful training run.
     """
     recognizer = cv2.face.LBPHFaceRecognizer_create()
@@ -111,7 +111,7 @@ def load_recognizer(trainer_path: str):
         logger.info("LBPH recognizer loaded from %s", trainer_path)
         return recognizer, True
     else:
-        logger.warning("Trainer file '%s' not found – recognizer uninitialized; all faces will be Unknown.", trainer_path)
+        logger.warning("Trainer file '%s' not found: recognizer uninitialized; all faces will be Unknown.", trainer_path)
         return recognizer, False
 
 
@@ -119,7 +119,7 @@ def load_emotion_model(emotion_model_path: str):
     """
     Load the pre-trained Keras emotion model.
 
-    This IS a hard requirement – a missing file causes a startup failure
+    This IS a hard requirement: a missing file causes a startup failure
     with an explicit error message naming the absent path.
     """
     if not os.path.exists(emotion_model_path):

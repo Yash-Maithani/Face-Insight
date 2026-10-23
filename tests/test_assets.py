@@ -90,7 +90,8 @@ def read(path):
 OWN_FILES = [p for p in web_files((".html", ".css", ".js")) if os.sep + "vendor" + os.sep not in p]
 CSS = read(os.path.join(STATIC, "css", "style.css"))
 
-client = server.app.test_client()
+from helpers import signed_in_client  # noqa: E402
+client = signed_in_client(server)
 res = client.get("/")
 html = res.get_data(as_text=True)
 
@@ -143,20 +144,20 @@ check("Fingerprint changes when a file changes", server.static_fingerprint(copy_
 section("4. Shell structure")
 
 tabs = re.findall(r'<button class="tab-btn[^"]*" data-tab="(\w+)"', html)
-check("Sidebar has the five sections in order",
-      tabs == ["monitor", "attendance", "dashboard", "register", "settings"], str(tabs))
+check("Sidebar has the six sections in order",
+      tabs == ["monitor", "attendance", "dashboard", "register", "settings", "audit"], str(tabs))
 check("Sidebar is a vertical tab list", 'aria-orientation="vertical"' in html)
 for item in ("sbCamera", "sbDatabase", "sbSocket", "sbUpdated"):
     check(f"Status bar has #{item}", f'id="{item}"' in html)
-for panel in ("monitor", "attendance", "dashboard", "register", "settings"):
+for panel in ("monitor", "attendance", "dashboard", "register", "settings", "audit"):
     check(f"Panel {panel} has its own heading", f'<h2 class="panel-title" id="title-{panel}">' in html)
 check("Event list has Pause and Clear", 'id="btnFeedPause"' in html and 'id="btnFeedClear"' in html)
-check("Dark mode is the default before first paint", 'var mode = "dark";' in html)
+check("Dark mode is the default before first paint", 'prefs.mode || stored.mode || "dark"' in html)
 
 # ──────────────────────────────────────────────────────────────────────────
 section("5. Interface rules (notes/DESIGN.md)")
 
-dash_hits = [os.path.relpath(p, PROJECT_ROOT) for p in OWN_FILES if re.search("[—–]", read(p))]
+dash_hits = [os.path.relpath(p, PROJECT_ROOT) for p in OWN_FILES if re.search("[\u2014\u2013]", read(p))]
 check("Rule 6: no em or en dashes", not dash_hits, str(dash_hits))
 
 gradient_hits = [os.path.relpath(p, PROJECT_ROOT) for p in OWN_FILES if "gradient" in read(p).lower()]

@@ -114,7 +114,8 @@ engine._cooldown_minutes = 60
 engine._auto_attend = True
 engine.set_names({PID: NAME})
 engine.reset_cooldowns()
-client = server.app.test_client()
+from helpers import signed_in_client, socket_client  # noqa: E402
+client = signed_in_client(server)
 
 if not test_db.is_connected:
     print("  [SKIP] MongoDB is not running on localhost:27017; nothing can be verified")
@@ -141,7 +142,7 @@ def detect_unknown():
 # ──────────────────────────────────────────────────────────────────────────
 section("1. Delete one record")
 
-sio = server.socketio.test_client(server.app)
+sio = socket_client(server, client)
 sio.get_received()  # drop the events sent on connect
 
 rec1 = detect_known()

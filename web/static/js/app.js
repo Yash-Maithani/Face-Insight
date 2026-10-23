@@ -6,8 +6,29 @@
 (function () {
     "use strict";
 
+    // ── Session ──────────────────────────────────────────────────────────
+    // A 401 from the API means the session ended (signed out elsewhere,
+    // expired, or the server restarted with a new key): go to sign-in.
+    const nativeFetch = window.fetch.bind(window);
+    let leaving = false;
+    window.fetch = function (...args) {
+        return nativeFetch(...args).then((res) => {
+            if (res.status === 401 && !leaving) {
+                leaving = true;
+                window.location.href = "/login?next=" + encodeURIComponent(window.location.pathname);
+            }
+            return res;
+        });
+    };
+
     // ── Socket.IO singleton ──────────────────────────────────────────────
     const socket = io({ transports: ["websocket", "polling"] });
+
+    // The server refuses sockets without a session. Ask the API why the
+    // connection failed: a 401 there sends the page to sign-in.
+    socket.on("connect_error", () => {
+        fetch("/api/me").catch(() => {});
+    });
 
     // ── Toast helper ─────────────────────────────────────────────────────
     let toastContainer = document.querySelector(".toast-container");
@@ -153,6 +174,93 @@
         });
     }
 
+    // ── Password confirmation ────────────────────────────────────────────
+    // Destructive actions need the password typed in the last 15 minutes.
+    // fetchFresh() runs a request; if the server asks for the password, it
+    // shows this dialog and retries once. It returns null if cancelled.
+    function passwordDialog() {
+        return new Promise((resolve) => {
+            const overlay = document.createElement("div");
+            overlay.className = "modal-overlay active";
+            overlay.innerHTML = `
+                <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pwConfirmTitle" tabindex="-1">
+                    <div class="modal__header">
+                        <h3 class="modal__title" id="pwConfirmTitle">Confirm your password</h3>
+                    </div>
+                    <form class="modal__body" novalidate>
+                        <p class="confirm-message">This action needs your password again.</p>
+                        <div class="form-group">
+                            <label for="pwConfirmInput" class="form-label">Password</label>
+                            <input id="pwConfirmInput" type="password" class="form-input" autocomplete="current-password" required>
+                        </div>
+                        <p class="modal-error" role="alert" hidden></p>
+                        <div class="modal__footer">
+                            <button type="button" class="btn btn--ghost" data-action="cancel">Cancel</button>
+                            <button type="submit" class="btn btn--primary">Confirm</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            const input = overlay.querySelector("input");
+            const error = overlay.querySelector(".modal-error");
+            const submit = overlay.querySelector('button[type="submit"]');
+            const release = trapFocus(overlay.querySelector(".modal"), input);
+
+            function close(result) {
+                document.removeEventListener("keydown", onKeydown, true);
+                overlay.remove();
+                release();
+                resolve(result);
+            }
+
+            function onKeydown(e) {
+                if (e.key === "Escape") {
+                    e.stopPropagation();
+                    close(false);
+                }
+            }
+
+            document.addEventListener("keydown", onKeydown, true);
+            overlay.querySelector('[data-action="cancel"]').addEventListener("click", () => close(false));
+            overlay.addEventListener("click", (e) => {
+                if (e.target === overlay) close(false);
+            });
+            overlay.querySelector("form").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                submit.disabled = true;
+                error.hidden = true;
+                try {
+                    const res = await fetch("/api/auth/confirm", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ password: input.value }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok) {
+                        close(true);
+                        return;
+                    }
+                    error.textContent = data.error || "Could not confirm the password.";
+                } catch (err) {
+                    error.textContent = "Could not reach the server.";
+                }
+                error.hidden = false;
+                submit.disabled = false;
+                input.select();
+            });
+        });
+    }
+
+    async function fetchFresh(url, opts) {
+        const res = await fetch(url, opts);
+        if (res.status !== 403) return res;
+        const body = await res.clone().json().catch(() => ({}));
+        if (!body.fresh_required) return res;
+        const confirmed = await passwordDialog();
+        return confirmed ? fetch(url, opts) : null;
+    }
+
     // ── Download ─────────────────────────────────────────────────────────
     // Starts a file download without navigating away, so a page with unsaved
     // settings does not ask "leave site?".
@@ -235,59 +343,80 @@
         if (sbUpdated) sbUpdated.textContent = new Date().toLocaleTimeString([], { hour12: false });
     }
 
-    // ── Theme: mode (light/dark/system) + color theme ────────────────────
-    // Stored per browser. The inline script in index.html applies the saved
-    // values before first paint; this module owns every later change.
+    // ── Theme: mode, colour theme and font ───────────────────────────────
+    // The page starts with the account's saved choices, applied before first
+    // paint by _prepaint.html. Changes are saved to the account, and to this
+    // browser so the sign-in page looks the same next time.
     const THEME_MODES = ["light", "dark", "system"];
     const THEME_COLORS = ["orange", "ink", "teal", "blue", "navy", "olive", "coffee", "steel"];
+    const THEME_FONTS = ["plex", "source", "atkinson", "inter"];
     const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
-
-    function readStored(key, allowed, fallback) {
-        try {
-            const value = localStorage.getItem(key);
-            return allowed.includes(value) ? value : fallback;
-        } catch (e) {
-            return fallback;
-        }
-    }
 
     function writeStored(key, value) {
         try {
             localStorage.setItem(key, value);
         } catch (e) {
-            // Storage unavailable (private mode): the choice lasts for this page only
+            // Storage unavailable (private mode): nothing to remember locally
         }
     }
 
-    let themeMode = readStored("fa-mode", THEME_MODES, "dark");
-    let themeColor = readStored("fa-theme", THEME_COLORS, "orange");
+    const startup = document.documentElement.dataset;
+    let themeMode = THEME_MODES.includes(startup.prefMode) ? startup.prefMode : "dark";
+    let themeColor = THEME_COLORS.includes(startup.theme) ? startup.theme : "orange";
+    let themeFont = THEME_FONTS.includes(startup.font) ? startup.font : "plex";
+    writeStored("fa-mode", themeMode);
+    writeStored("fa-theme", themeColor);
+    writeStored("fa-font", themeFont);
+
+    function savePreference(key, value) {
+        writeStored("fa-" + key, value);
+        fetch("/api/me/preferences", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ [key]: value }),
+        })
+            .then((r) => {
+                if (!r.ok) throw new Error("not saved");
+            })
+            .catch(() => showToast("Could not save this to your account. It applies in this browser only.", "error"));
+    }
 
     function applyTheme() {
         const dark = themeMode === "dark" || (themeMode === "system" && systemDark.matches);
         const root = document.documentElement;
+        root.dataset.prefMode = themeMode;
         root.dataset.mode = dark ? "dark" : "light";
         root.dataset.theme = themeColor;
+        root.dataset.font = themeFont;
         window.dispatchEvent(
-            new CustomEvent("themechange", { detail: { mode: themeMode, color: themeColor, dark } })
+            new CustomEvent("themechange", { detail: { mode: themeMode, color: themeColor, font: themeFont, dark } })
         );
     }
 
     const theme = {
         modes: THEME_MODES,
         colors: THEME_COLORS,
+        fonts: THEME_FONTS,
         getMode: () => themeMode,
         getColor: () => themeColor,
+        getFont: () => themeFont,
         setMode(mode) {
-            if (!THEME_MODES.includes(mode)) return;
+            if (!THEME_MODES.includes(mode) || mode === themeMode) return;
             themeMode = mode;
-            writeStored("fa-mode", mode);
             applyTheme();
+            savePreference("mode", mode);
         },
         setColor(color) {
-            if (!THEME_COLORS.includes(color)) return;
+            if (!THEME_COLORS.includes(color) || color === themeColor) return;
             themeColor = color;
-            writeStored("fa-theme", color);
             applyTheme();
+            savePreference("theme", color);
+        },
+        setFont(font) {
+            if (!THEME_FONTS.includes(font) || font === themeFont) return;
+            themeFont = font;
+            applyTheme();
+            savePreference("font", font);
         },
     };
 
@@ -316,6 +445,7 @@
         dashboard: "Dashboard",
         register: "Register",
         settings: "Settings",
+        audit: "Audit log",
     };
 
     function parseRoute() {
@@ -882,6 +1012,7 @@
         getThreshold,
         trapFocus,
         confirm: confirmDialog,
+        fetchFresh,
         download,
         showToast,
         setKpi,
