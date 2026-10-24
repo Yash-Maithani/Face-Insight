@@ -12,11 +12,13 @@ This is version 1. It is meant for one PC with one camera, on a network you trus
 
 ## What's in it
 
-**Live Monitor.** The camera feed with a box and a name on every face, live counts, and a running list of who was just logged. Click an entry to open its record.
+**Live Monitor.** The camera feed with a box and a name on every face, live counts, and a running list of who was just logged. Click an entry to open its record. After the late cut-off, a "Not here yet" list shows who is expected today and has not been seen.
 
 **Attendance.** One day or a date range. Filter by Present, Late or Unknown, sort the table, open a record to see the face crop that triggered it, mark a registered person by hand, export to Excel or CSV, and delete an entry that should not be there.
 
-**People.** Everyone registered, with a search. Each person has a page with their attendance day by day over any date range: Present, Late or Absent, when they were first and last seen, and the records behind each day. Names are changed here.
+**People.** Everyone registered, with a search. Each person has a page with their attendance day by day over any date range: Present, Late or Absent, whether they left early, when they were first and last seen, and the records behind each day. Names and groups are changed here.
+
+**Review.** A match that came close to the recognition threshold is kept aside instead of counting. Someone looks at the face crop and confirms or rejects it.
 
 **Dashboard.** Totals for today, an attendance trend over 7, 14 or 30 days or dates you pick, today's expressions, and how many days each person attended.
 
@@ -26,7 +28,7 @@ This is version 1. It is meant for one PC with one camera, on a network you trus
 
 **Audit log.** Sign-ins, failed sign-ins and every change or delete, with who did it and when. Filter by person, action and date.
 
-**Settings.** Light, dark or system mode, eight colour themes and four fonts (saved to your account), admin accounts, the database connection, the late cut-off, cooldown and working days, and a reset for today's records.
+**Settings.** Light, dark or system mode, eight colour themes and four fonts (saved to your account), admin accounts, the database connection, groups with their own working days, start, late cut-off and end, the cooldown and review margin, and a reset for today's records.
 
 ## How it works
 
@@ -118,7 +120,7 @@ Ask people before you register their face.
 - **Every account is an admin.** There are no read-only accounts yet. Deleting a person or clearing a day asks for your password again, and the **Audit log** tab shows who did what.
 - **Recognition is basic.** LBPH is sensitive to lighting, angle and glasses, and there is no liveness check, so a photo held up to the camera can pass. I have not measured its accuracy.
 - **Expression is a rough guess.** Treat it as a curiosity, not a fact about someone.
-- **Absent means "no record on a working day".** There is one set of working days and one late cut-off for everyone; per-group schedules are not there yet. Left early is not worked out.
+- **Absent means "no record on a working day".** Left early needs the camera to see people more than once a day, for example a camera in the room rather than at the door.
 - **PDF reports use a standard font.** Names in scripts other than Latin may not show correctly in the PDF. The CSV is fine.
 - **Only tried on Windows.**
 

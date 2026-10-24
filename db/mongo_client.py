@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__)
 _SERVER_SELECTION_TIMEOUT_MS = 3000
 
 
+# Records waiting for review, or rejected in review, do not count
+COUNTED = {"review": {"$nin": ["pending", "rejected"]}}
+
+
 def _date_list(date_from: str, date_to: str) -> list[str]:
     """Every YYYY-MM-DD date from one to the other, inclusive."""
     start = datetime.strptime(date_from, "%Y-%m-%d").date()
@@ -62,6 +66,7 @@ class MongoAttendanceDB:
             self._collection.create_index([("date", ASCENDING)])
             db["audit_log"].create_index([("ts", DESCENDING)])
             db["persons"].create_index([("person_id", ASCENDING)], unique=True)
+            db["attendance_logs"].create_index([("review", ASCENDING)], sparse=True)
             self._connected = True
             logger.info("MongoDB connected: %s / %s", mask_mongo_uri(self._uri), self._db_name)
         except PyMongoError as exc:
@@ -349,7 +354,7 @@ class MongoAttendanceDB:
             return {}
         try:
             pipeline = [
-                {"$match": {"status": {"$ne": "Unknown"}, "person_id": {"$ne": None}}},
+                {"$match": dict(COUNTED, status={"$ne": "Unknown"}, person_id={"$ne": None})},
                 {"$group": {"_id": "$person_id",
                             "last": {"$max": {"$concat": ["$date", " ", {"$ifNull": ["$time_in", ""]}]}}}},
             ]
@@ -358,6 +363,63 @@ class MongoAttendanceDB:
             logger.error("last_seen_by_person failed: %s", exc)
             self._connected = False
             return {}
+
+    # ── review queue ──────────────────────────────────────────────────────
+
+    def find_review(self, state: str = "pending", limit: int = 500) -> list[dict] | None:
+        """Records with this review state, newest first. None if unreachable."""
+        if not self._connected:
+            return None
+        try:
+            docs = list(self._collection.find({"review": state})
+                        .sort([("date", DESCENDING), ("time_in", DESCENDING)]).limit(limit))
+            for d in docs:
+                d["id"] = str(d.pop("_id"))
+                if "created_at" in d and hasattr(d["created_at"], "isoformat"):
+                    d["created_at"] = d["created_at"].isoformat()
+            return docs
+        except PyMongoError as exc:
+            logger.error("find_review failed: %s", exc)
+            self._connected = False
+            return None
+
+    def count_review(self, state: str = "pending") -> int | None:
+        if not self._connected:
+            return None
+        try:
+            return self._collection.count_documents({"review": state})
+        except PyMongoError as exc:
+            logger.error("count_review failed: %s", exc)
+            self._connected = False
+            return None
+
+    def set_review(self, record_id: str, current: str, decision: str, by: str, at: str) -> dict | None:
+        """Move a record from review state `current` to `decision`. Returns
+        the updated record, or None if it is not in that state (or unreachable)."""
+        if not self._connected:
+            return None
+        from bson import ObjectId
+        from bson.errors import InvalidId
+        try:
+            oid = ObjectId(record_id)
+        except (InvalidId, TypeError):
+            return None
+        try:
+            doc = self._collection.find_one_and_update(
+                {"_id": oid, "review": current},
+                {"$set": {"review": decision, "reviewed_by": by, "reviewed_at": at}},
+                return_document=ReturnDocument.AFTER,
+            )
+            if doc is None:
+                return None
+            doc["id"] = str(doc.pop("_id"))
+            if "created_at" in doc and hasattr(doc["created_at"], "isoformat"):
+                doc["created_at"] = doc["created_at"].isoformat()
+            return doc
+        except PyMongoError as exc:
+            logger.error("set_review failed: %s", exc)
+            self._connected = False
+            return None
 
     def get_today_logs(self) -> list[dict]:
         today = datetime.now().strftime("%Y-%m-%d")
@@ -383,7 +445,7 @@ class MongoAttendanceDB:
 
         try:
             pipeline = [
-                {"$match": {"date": {"$in": dates}}},
+                {"$match": dict(COUNTED, date={"$in": dates})},
                 {"$group": {
                     "_id": {"date": "$date", "status": "$status"},
                     "count": {"$sum": 1},
@@ -450,7 +512,7 @@ class MongoAttendanceDB:
             return []
         try:
             pipeline = [
-                {"$match": {"date": {"$gte": date_from, "$lte": date_to}, "status": {"$ne": "Unknown"}}},
+                {"$match": dict(COUNTED, date={"$gte": date_from, "$lte": date_to}, status={"$ne": "Unknown"})},
                 {"$group": {
                     "_id": {"person_id": "$person_id", "name": "$name"},
                     "count": {"$sum": 1},

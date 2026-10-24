@@ -213,7 +213,7 @@ check("Content-Disposition has filename", f"attendance_{today}.csv" in res_csv.h
 csv_content = res_csv.data.decode("utf-8")
 csv_reader = list(csv.reader(io.StringIO(csv_content)))
 check("CSV has header + 4 data rows", len(csv_reader) == 5, f"got {len(csv_reader)}")
-expected_cols = ["Name", "ID", "Time In", "Status", "Emotion", "Confidence", "Manual"]
+expected_cols = ["Date", "Name", "ID", "Time In", "Status", "Emotion", "Confidence", "Manual", "Review"]
 check("CSV header columns match expected", csv_reader[0] == expected_cols, str(csv_reader[0]))
 
 # Excel export

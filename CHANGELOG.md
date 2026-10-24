@@ -21,6 +21,15 @@ All notable changes to Face Insight.
 - Collecting images for a taken ID can no longer rename that person, and manual marks only accept registered people.
 - Unknown faces are stored without a person ID; the recogniser's guess is kept separately.
 
+### Schedules, absence and review
+- Groups, each with its own working days, start, late cut-off and end. Everyone starts in Default, which keeps the existing settings.
+- Late is judged from the person's group, as a time of day; nobody is Late on a non-working day.
+- Left early: shown when the camera saw someone more than once and the last time was before the end.
+- "Not here yet" on the Live Monitor: who is expected today and has not been seen, once the late cut-off has passed.
+- A Review tab: matches close to the threshold wait there and count only once confirmed. Decisions are audited.
+- Cooldowns are rebuilt from today's records on start, so a restart does not log anyone twice. Unknown faces no longer all share one cooldown.
+- Excel and CSV exports now have Date and Review columns.
+
 ### Audit log
 - A new tab lists sign-ins, failed sign-ins and every change or delete, with who did it and when. Filter by person, action and date.
 - Entries made while the database is offline are kept in a local file and still shown.

@@ -2,10 +2,18 @@
 attendance/engine.py
 Core attendance logic:  cooldown tracking, Present/Late/Unknown status,
 auto-attend gating, manual marks, and today-stats aggregation.
+
+Late is judged from the person's group schedule (attendance/schedules.py).
+Cooldowns are rebuilt from today's records on start, so a restart does not
+log anyone twice. Each unknown face gets its own cooldown, keyed by the
+registered face it came closest to. A match close to the threshold is
+saved for review instead of counting straight away.
 """
 
 import logging
 from datetime import datetime
+
+from attendance.schedules import DEFAULT_GROUP, schedules_of, status_at
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +46,19 @@ class AttendanceEngine:
         self._late_after = att.get("late_after", "09:30")
         self._working_hours_end = att.get("working_hours_end", "17:30")
         self._auto_attend = att.get("auto_attend", True)
+        self._review_margin = att.get("review_margin", 15)
+        self._threshold = cfg.get("confidence_threshold", 60)
+        self._default_schedule = schedules_of(cfg)[DEFAULT_GROUP]
+        # person_id -> schedule; set by the server from the people registry
+        self._schedule_for = None
 
         # Registered-person names {int_id: str}
         self._names: dict[int, str] = {int(k): v for k, v in cfg.get("names", {}).items()}
 
         # Cooldown tracking: {person_id: datetime_of_last_log}
         self._last_logged: dict[int, datetime] = {}
-        # Single shared cooldown for unknown faces
-        self._last_unknown_logged: datetime | None = None
+        # Unknown faces: {closest registered ID, or None: datetime_of_last_log}
+        self._last_unknown_logged: dict = {}
 
     # ── configuration mutators ────────────────────────────────────────────
 
@@ -58,6 +71,34 @@ class AttendanceEngine:
         self._late_after = att.get("late_after", self._late_after)
         self._working_hours_end = att.get("working_hours_end", self._working_hours_end)
         self._auto_attend = att.get("auto_attend", self._auto_attend)
+        self._review_margin = att.get("review_margin", self._review_margin)
+        self._default_schedule = schedules_of(cfg)[DEFAULT_GROUP]
+
+    def set_threshold(self, value):
+        self._threshold = value
+
+    def set_schedule_lookup(self, schedule_for):
+        """`schedule_for(person_id)` returns that person's schedule."""
+        self._schedule_for = schedule_for
+
+    def schedule_for(self, person_id):
+        if self._schedule_for:
+            try:
+                return self._schedule_for(person_id)
+            except Exception as exc:  # never lose a sighting over a lookup
+                logger.error("Schedule lookup failed for %s: %s", person_id, exc)
+        return self._default_schedule
+
+    def needs_review(self, confidence):
+        """A match in the top `review_margin` percent below the threshold is
+        close enough to be a different person: an admin should look."""
+        if not self._review_margin or self._review_margin <= 0:
+            return False
+        return confidence > self._threshold * (1 - self._review_margin / 100)
+
+    @staticmethod
+    def _unknown_key(guess):
+        return guess if isinstance(guess, int) and guess >= 0 else None
 
     def set_auto_attend(self, enabled: bool):
         self._auto_attend = enabled
@@ -78,18 +119,16 @@ class AttendanceEngine:
         # ── cooldown check ────────────────────────────────────────────
         if is_known:
             last = self._last_logged.get(person_id)
-            if last and (now - last).total_seconds() < self._cooldown_minutes * 60:
-                return None
         else:
-            if self._last_unknown_logged and (now - self._last_unknown_logged).total_seconds() < self._cooldown_minutes * 60:
-                return None
+            last = self._last_unknown_logged.get(self._unknown_key(person_id))
+        if last and (now - last).total_seconds() < self._cooldown_minutes * 60:
+            return None
 
         # ── status ────────────────────────────────────────────────────
         if not is_known:
             status = "Unknown"
         else:
-            time_str = now.strftime("%H:%M")
-            status = "Late" if time_str >= self._late_after else "Present"
+            status = status_at(self.schedule_for(person_id), now)
 
         name = self._names.get(person_id, "Unknown") if is_known else "Unknown"
 
@@ -108,6 +147,8 @@ class AttendanceEngine:
         }
         if not is_known:
             record["guessed_person_id"] = person_id
+        elif self.needs_review(confidence):
+            record["review"] = "pending"
 
         saved = self._db.insert_log(record)
         if saved:
@@ -136,7 +177,7 @@ class AttendanceEngine:
             if is_known:
                 self._last_logged[person_id] = now
             else:
-                self._last_unknown_logged = now
+                self._last_unknown_logged[self._unknown_key(person_id)] = now
             return saved
         return None
 
@@ -166,7 +207,35 @@ class AttendanceEngine:
     def reset_cooldowns(self):
         """Forget every cooldown, so anyone can be recorded again at once."""
         self._last_logged.clear()
-        self._last_unknown_logged = None
+        self._last_unknown_logged.clear()
+
+    def restore_cooldowns(self):
+        """Rebuild today's cooldowns from today's camera records, so a restart
+        does not log anyone again inside their cooldown. Returns how many."""
+        now = self._clock()
+        today = now.strftime("%Y-%m-%d")
+        restored = 0
+        for r in self._db.get_logs_between(today, today):
+            if r.get("manual"):
+                continue
+            try:
+                stamp = datetime.strptime(f"{r.get('date')} {r.get('time_in')}", "%Y-%m-%d %H:%M:%S")
+            except (TypeError, ValueError):
+                continue
+            if stamp > now:
+                continue
+            if r.get("status") == "Unknown":
+                key = self._unknown_key(r.get("guessed_person_id"))
+                table = self._last_unknown_logged
+            else:
+                key = r.get("person_id")
+                table = self._last_logged
+            if key is None and table is self._last_logged:
+                continue
+            if table.get(key) is None or stamp > table[key]:
+                table[key] = stamp
+                restored += 1
+        return restored
 
     def forget_record(self, record: dict):
         """Drop the cooldown a deleted record started, if it is still the one
@@ -178,9 +247,10 @@ class AttendanceEngine:
         stamp = f"{record.get('date')} {record.get('time_in')}"
         fmt = "%Y-%m-%d %H:%M:%S"
         if record.get("status") == "Unknown":
-            last = self._last_unknown_logged
+            key = self._unknown_key(record.get("guessed_person_id"))
+            last = self._last_unknown_logged.get(key)
             if last and last.strftime(fmt) == stamp:
-                self._last_unknown_logged = None
+                del self._last_unknown_logged[key]
         else:
             person_id = record.get("person_id")
             last = self._last_logged.get(person_id)
@@ -192,10 +262,14 @@ class AttendanceEngine:
     def get_today_stats(self) -> dict:
         """Return ``{total, present, late}`` for today.
 
-        ``total`` represents ALL of today's records including Unknown.
+        ``total`` represents ALL of today's counted records including Unknown.
         ``present`` is the Present count; ``late`` is the Late count.
+        Records waiting for review, or rejected in review, are not counted;
+        ``review`` says how many of today's are waiting.
         """
         logs = self._db.get_today_logs()
+        pending = sum(1 for r in logs if r.get("review") == "pending")
+        logs = [r for r in logs if r.get("review") not in ("pending", "rejected")]
         present = sum(1 for r in logs if r.get("status") == "Present")
         late = sum(1 for r in logs if r.get("status") == "Late")
-        return {"total": len(logs), "present": present, "late": late}
+        return {"total": len(logs), "present": present, "late": late, "review": pending}

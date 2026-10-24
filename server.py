@@ -34,8 +34,10 @@ from core.collector import DataCollector
 from core.trainer import ModelTrainer
 from auth.audit import AuditLog
 from auth.store import UserStore, prefs_of
-from auth.web import fresh_required, init_auth, load_secret_key
+from auth.web import current_username, fresh_required, init_auth, load_secret_key
 from attendance.reports import RangeError, parse_range
+from attendance.schedules import DEFAULT_GROUP, schedules_of
+from attendance.web import create_blueprint as attendance_blueprint
 from people.migration import migrate
 from people.registry import PersonError, PersonRegistry
 from people.web import create_blueprint as people_blueprint
@@ -137,16 +139,31 @@ people = PersonRegistry(
 
 def _run_migration():
     """Move people into the database and fix old Unknown records, once.
-    Backs up first; does nothing when there is nothing to change."""
+    Backs up first; does nothing when there is nothing to change. Then
+    rebuild today's cooldowns from the records, so a restart does not log
+    anyone twice."""
     try:
         report = migrate(mongo_db, people, BACKUP_DIR)
     except Exception as exc:  # the backup was written before any change
         logger.error("Migration failed: %s", exc)
         report = None
     detector.update_names(people.names())
+    if mongo_db.is_connected:
+        restored = engine.restore_cooldowns()
+        if restored:
+            logger.info("Restored %d cooldown(s) from today's records", restored)
     return report
 
 
+def _schedule_for(person_id):
+    """The schedule of a person's group, read from the config copy so it
+    works while the database is down."""
+    current = load_config()
+    scheds = schedules_of(current)
+    return scheds.get(people.group_of(person_id, current), scheds[DEFAULT_GROUP])
+
+
+engine.set_schedule_lookup(_schedule_for)
 _run_migration()
 
 
@@ -174,6 +191,18 @@ def _image_counts():
 app.register_blueprint(people_blueprint(
     lambda: mongo_db, people, lambda: load_config(),
     lambda *a, **k: audit_event(*a, **k), _image_counts,
+))
+
+
+def _on_review(record):
+    """A review decision changes what counts: tell every open page."""
+    socketio.emit("review:update", {"id": record["id"], "review": record["review"], "date": record.get("date")})
+    socketio.emit("stats:update", _stats_payload())
+
+
+app.register_blueprint(attendance_blueprint(
+    lambda: mongo_db, people, lambda: load_config(), lambda current: save_config(current),
+    lambda *a, **k: audit_event(*a, **k), current_username, _on_review,
 ))
 
 
@@ -473,6 +502,8 @@ def _stats_payload():
     stats = engine.get_today_stats()
     stats.update(detector.get_stats())
     stats["db_connected"] = mongo_db.is_connected
+    # Every match still waiting for review, any day (drives the sidebar count)
+    stats["review_pending"] = mongo_db.count_review("pending") if mongo_db.is_connected else None
     return stats
 
 
@@ -611,6 +642,12 @@ def _validate_config(data: dict, current: dict):
         if eff_late >= eff_end:
             return False, "late_after must be earlier than working_hours_end", "late_after"
 
+    # Review margin: percent of the threshold that counts as "too close to call"
+    margin = att.get("review_margin") if isinstance(att, dict) else None
+    if margin is not None:
+        if isinstance(margin, bool) or not isinstance(margin, int) or not 0 <= margin <= 50:
+            return False, "review_margin must be a whole number from 0 to 50", "review_margin"
+
     # Working days: weekday numbers, Monday = 0
     working_days = att.get("working_days") if isinstance(att, dict) else None
     if working_days is not None:
@@ -705,6 +742,10 @@ def config_post():
 
     if "attendance" in data and isinstance(data["attendance"], dict):
         current.setdefault("attendance", {}).update(data["attendance"])
+        # The Default group's start may not come after its new late cut-off
+        att_now = current["attendance"]
+        if "late_after" in data["attendance"] and att_now.get("start", "") > att_now["late_after"]:
+            att_now["start"] = att_now["late_after"]
     for k, v in data.items():
         if k != "attendance":
             current[k] = v

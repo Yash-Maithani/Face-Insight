@@ -1,7 +1,8 @@
 """
 attendance/exporter.py
 Export attendance records to Excel (.xlsx) and CSV files.
-Column order (both formats): Name, ID, Time In, Status, Emotion, Confidence, Manual.
+Column order (both formats): Date, Name, ID, Time In, Status, Emotion,
+Confidence, Manual, Review. Date matters once an export covers a range.
 """
 
 import csv
@@ -11,12 +12,13 @@ from openpyxl import Workbook
 
 logger = logging.getLogger(__name__)
 
-COLUMNS = ["Name", "ID", "Time In", "Status", "Emotion", "Confidence", "Manual"]
+COLUMNS = ["Date", "Name", "ID", "Time In", "Status", "Emotion", "Confidence", "Manual", "Review"]
 
 
 def _record_to_row(record: dict) -> list:
     """Extract a row list from a record dict in the canonical column order."""
     return [
+        record.get("date", ""),
         record.get("name", ""),
         record.get("person_id", ""),
         record.get("time_in", ""),
@@ -24,6 +26,7 @@ def _record_to_row(record: dict) -> list:
         record.get("emotion", ""),
         record.get("confidence", ""),
         record.get("manual", ""),
+        record.get("review") or "",
     ]
 
 

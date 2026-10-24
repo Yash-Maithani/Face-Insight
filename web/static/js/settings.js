@@ -1,7 +1,7 @@
 /* ==========================================================================
    settings.js - Settings Tab
-   Appearance, database config, Firebase sync, attendance rules (with
-   working days), accounts and the danger zone. Names live on the People page.
+   Appearance, database config, Firebase sync, attendance rules, groups and
+   their schedules, accounts and the danger zone. Names live on the People page.
    ========================================================================== */
 
 (function () {
@@ -17,16 +17,12 @@
     const inputFirebaseCred = document.getElementById("settingsFirebaseCred");
 
     const inputCooldown = document.getElementById("settingsCooldown");
-    const inputLateAfter = document.getElementById("settingsLateAfter");
-    const inputWorkingEnd = document.getElementById("settingsWorkingEnd");
+    const inputReviewMargin = document.getElementById("settingsReviewMargin");
 
     const errCooldown = document.getElementById("errCooldown");
-    const errLateAfter = document.getElementById("errLateAfter");
-    const errWorkingEnd = document.getElementById("errWorkingEnd");
+    const errReviewMargin = document.getElementById("errReviewMargin");
     const errMongoUri = document.getElementById("errMongoUri");
     const errMongoDb = document.getElementById("errMongoDb");
-    const errWorkingDays = document.getElementById("errWorkingDays");
-    const workingDayBoxes = document.querySelectorAll('#settingsWorkingDays input[name="workingDay"]');
 
     const btnSave = document.getElementById("btnSaveSettings");
     const saveStatus = document.getElementById("settingsSaveStatus");
@@ -49,16 +45,9 @@
             firebase_credentials: inputFirebaseCred.value.trim(),
             attendance: {
                 cooldown_minutes: parseInt(inputCooldown.value, 10),
-                late_after: inputLateAfter.value,
-                working_hours_end: inputWorkingEnd.value,
-                working_days: checkedWorkingDays(),
+                review_margin: parseInt(inputReviewMargin.value, 10),
             },
         };
-    }
-
-    // Weekday numbers, Monday = 0
-    function checkedWorkingDays() {
-        return Array.from(workingDayBoxes).filter((b) => b.checked).map((b) => Number(b.value));
     }
 
     function isDirty() {
@@ -246,13 +235,8 @@
 
             const att = cfg.attendance || {};
             if (inputCooldown) inputCooldown.value = att.cooldown_minutes || 60;
-            if (inputLateAfter) inputLateAfter.value = att.late_after || "09:30";
-            if (inputWorkingEnd) inputWorkingEnd.value = att.working_hours_end || "17:30";
+            inputReviewMargin.value = att.review_margin !== undefined ? att.review_margin : 15;
 
-            const days = Array.isArray(att.working_days) && att.working_days.length ? att.working_days : [0, 1, 2, 3, 4];
-            workingDayBoxes.forEach((b) => {
-                b.checked = days.includes(Number(b.value));
-            });
             savedSnapshot = JSON.stringify(currentPayload());
             updateDirtyUi();
         } catch (err) {
@@ -299,8 +283,7 @@
             clearErrors();
 
             const cooldown = parseInt(inputCooldown.value, 10);
-            const lateAfter = inputLateAfter.value;
-            const workingEnd = inputWorkingEnd.value;
+            const margin = parseInt(inputReviewMargin.value, 10);
 
             let clientValid = true;
 
@@ -309,23 +292,8 @@
                 clientValid = false;
             }
 
-            const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
-            if (!lateAfter || !timePattern.test(lateAfter)) {
-                if (errLateAfter) errLateAfter.textContent = "Late After must be a valid time (HH:MM)";
-                clientValid = false;
-            }
-            if (!workingEnd || !timePattern.test(workingEnd)) {
-                if (errWorkingEnd) errWorkingEnd.textContent = "Working Hours End must be a valid time (HH:MM)";
-                clientValid = false;
-            }
-
-            if (clientValid && lateAfter >= workingEnd) {
-                if (errLateAfter) errLateAfter.textContent = "Late After must be earlier than Working Hours End";
-                clientValid = false;
-            }
-
-            if (checkedWorkingDays().length === 0) {
-                if (errWorkingDays) errWorkingDays.textContent = "Pick at least one working day";
+            if (isNaN(margin) || margin < 0 || margin > 50) {
+                errReviewMargin.textContent = "Review margin must be a whole number from 0 to 50";
                 clientValid = false;
             }
 
@@ -351,12 +319,8 @@
                     // Display server validation error
                     if (data.field === "cooldown_minutes" && errCooldown) {
                         errCooldown.textContent = data.error;
-                    } else if (data.field === "late_after" && errLateAfter) {
-                        errLateAfter.textContent = data.error;
-                    } else if (data.field === "working_hours_end" && errWorkingEnd) {
-                        errWorkingEnd.textContent = data.error;
-                    } else if (data.field === "working_days" && errWorkingDays) {
-                        errWorkingDays.textContent = data.error;
+                    } else if (data.field === "review_margin") {
+                        errReviewMargin.textContent = data.error;
                     }
                     window.App.showToast(data.error || "Failed to save settings", "error");
                     if (saveStatus) saveStatus.textContent = "Failed to save";
@@ -378,6 +342,152 @@
             }
         });
     }
+
+    // ── Groups and schedules ─────────────────────────────────────────────
+    // Each group has working days, a start, a late cut-off and an end. The
+    // Default group always exists. Saved on its own, not with the form above.
+    const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const schedulesList = document.getElementById("schedulesList");
+    const newGroupName = document.getElementById("newGroupName");
+    const btnAddGroup = document.getElementById("btnAddGroup");
+    const btnSaveSchedules = document.getElementById("btnSaveSchedules");
+    const errSchedules = document.getElementById("errSchedules");
+    const schedulesStatus = document.getElementById("schedulesStatus");
+    let groups = [];        // [{name, working_days, start, late_after, end, members}]
+    let groupsSaved = "";   // JSON of the groups as last loaded or saved
+
+    function groupsJson() {
+        const out = {};
+        groups.forEach((g) => {
+            out[g.name] = { working_days: g.working_days, start: g.start, late_after: g.late_after, end: g.end };
+        });
+        return JSON.stringify(out);
+    }
+
+    function updateGroupsDirty() {
+        const dirty = groupsJson() !== groupsSaved;
+        btnSaveSchedules.disabled = !dirty;
+        schedulesStatus.textContent = dirty ? "Unsaved changes" : schedulesStatus.textContent === "Unsaved changes" ? "" : schedulesStatus.textContent;
+    }
+
+    function renderGroups() {
+        const esc = window.App.escapeHtml;
+        schedulesList.innerHTML = groups
+            .map((g, i) => `
+                <fieldset class="schedule-row" data-index="${i}">
+                    <legend class="schedule-row__name">${esc(g.name)}
+                        <span class="schedule-row__members">${g.members} ${g.members === 1 ? "person" : "people"}</span>
+                    </legend>
+                    <div class="check-chips" role="group" aria-label="Working days for ${esc(g.name)}">
+                        ${WEEKDAYS.map((d, n) => `<label class="check-chip"><input type="checkbox" data-day="${n}" ${g.working_days.includes(n) ? "checked" : ""}><span>${d}</span></label>`).join("")}
+                    </div>
+                    <div class="schedule-row__times">
+                        <label>Start <input type="time" class="form-input" data-field="start" value="${esc(g.start)}"></label>
+                        <label>Late after <input type="time" class="form-input" data-field="late_after" value="${esc(g.late_after)}"></label>
+                        <label>End <input type="time" class="form-input" data-field="end" value="${esc(g.end)}"></label>
+                        ${g.name === "Default"
+                            ? '<span class="form-hint">Everyone starts here.</span>'
+                            : `<button type="button" class="btn btn--ghost btn--sm" data-remove ${g.members ? `disabled title="Move its ${g.members} ${g.members === 1 ? "person" : "people"} to another group first"` : ""}>Remove</button>`}
+                    </div>
+                </fieldset>`)
+            .join("");
+    }
+
+    schedulesList.addEventListener("change", (e) => {
+        const row = e.target.closest(".schedule-row");
+        if (!row) return;
+        const g = groups[Number(row.dataset.index)];
+        if (e.target.dataset.day !== undefined) {
+            const day = Number(e.target.dataset.day);
+            g.working_days = e.target.checked
+                ? [...new Set([...g.working_days, day])].sort()
+                : g.working_days.filter((d) => d !== day);
+        } else if (e.target.dataset.field) {
+            g[e.target.dataset.field] = e.target.value;
+        }
+        updateGroupsDirty();
+    });
+
+    schedulesList.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-remove]");
+        if (!btn) return;
+        groups.splice(Number(btn.closest(".schedule-row").dataset.index), 1);
+        renderGroups();
+        updateGroupsDirty();
+    });
+
+    btnAddGroup.addEventListener("click", () => {
+        errSchedules.textContent = "";
+        const name = newGroupName.value.trim().replace(/\s+/g, " ");
+        if (!name) {
+            errSchedules.textContent = "Type a name for the new group.";
+            return;
+        }
+        if (groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) {
+            errSchedules.textContent = `There is already a group called ${name}.`;
+            return;
+        }
+        const base = groups[0];
+        groups.push({ name, working_days: [...base.working_days], start: base.start, late_after: base.late_after, end: base.end, members: 0 });
+        newGroupName.value = "";
+        renderGroups();
+        updateGroupsDirty();
+    });
+
+    async function loadGroups() {
+        try {
+            const res = await fetch("/api/schedules");
+            if (!res.ok) throw new Error("schedules");
+            groups = (await res.json()).groups || [];
+            groupsSaved = groupsJson();
+            renderGroups();
+            updateGroupsDirty();
+        } catch (err) {
+            window.App.renderState(schedulesList, "error", "Could not load the groups.", loadGroups);
+        }
+    }
+
+    btnSaveSchedules.addEventListener("click", async () => {
+        errSchedules.textContent = "";
+        for (const g of groups) {
+            if (!g.working_days.length) {
+                errSchedules.textContent = `${g.name}: pick at least one working day.`;
+                return;
+            }
+            if (!(g.start && g.late_after && g.end && g.start <= g.late_after && g.late_after < g.end)) {
+                errSchedules.textContent = `${g.name}: times must run in order: start, then late after, then end.`;
+                return;
+            }
+        }
+        btnSaveSchedules.disabled = true;
+        try {
+            const res = await fetch("/api/schedules", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ groups: JSON.parse(groupsJson()) }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                errSchedules.textContent = data.error || "The groups were not saved.";
+                updateGroupsDirty();
+                return;
+            }
+            groups = data.groups;
+            groupsSaved = groupsJson();
+            renderGroups();
+            updateGroupsDirty();
+            schedulesStatus.textContent = `Saved at ${new Date().toLocaleTimeString()}`;
+            window.dispatchEvent(new CustomEvent("schedules:change"));
+        } catch (err) {
+            errSchedules.textContent = "Could not reach the server.";
+            updateGroupsDirty();
+        }
+    });
+
+    loadGroups();
+    window.addEventListener("tab:navigate", (e) => {
+        if (e.detail && e.detail.tab === "settings" && groupsJson() === groupsSaved) loadGroups();
+    });
 
     // ── Danger zone: delete today's records ──────────────────────────────
     // Not part of the settings form: it acts at once, after a confirmation

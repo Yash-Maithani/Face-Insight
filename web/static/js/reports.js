@@ -151,6 +151,7 @@
                     <td data-label="Late" class="col-num">${t.Late}</td>
                     <td data-label="Absent" class="col-num">${t.Absent}</td>
                     <td data-label="Not seen yet" class="col-num">${t["Not seen yet"]}</td>
+                    <td data-label="Left early" class="col-num">${t["Left early"]}</td>
                 </tr>`)
             .join("");
         totalsTable.hidden = false;
@@ -164,13 +165,14 @@
                     <td data-label="ID" class="col-num"><code>${r.person_id}</code></td>
                     <td data-label="Name">${App.escapeHtml(r.name)}</td>
                     <td data-label="Status"><span class="status-badge ${STATUS_CLASS[r.status] || ""}">${App.escapeHtml(r.status)}</span></td>
+                    <td data-label="Left early">${r.left_early ? "Yes" : "No"}</td>
                     <td data-label="First seen" class="mono">${r.first_seen || "--"}</td>
                     <td data-label="Last seen" class="mono">${r.last_seen || "--"}</td>
                     <td data-label="Records" class="col-num">${r.sightings}</td>
                     <td data-label="Manual">${r.manual ? "Yes" : "No"}</td>
                 </tr>`)
             .join("") + (report.rows.length > shown.length
-            ? `<tr><td colspan="8" class="table-note">Showing the first ${PREVIEW_ROWS} of ${report.rows.length} rows. The CSV and PDF have all of them.</td></tr>`
+            ? `<tr><td colspan="9" class="table-note">Showing the first ${PREVIEW_ROWS} of ${report.rows.length} rows. The CSV and PDF have all of them.</td></tr>`
             : "");
         rowsCard.hidden = false;
         setDownloads(true);

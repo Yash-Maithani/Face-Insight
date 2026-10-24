@@ -34,6 +34,11 @@
                 <svg class="tab-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 <span class="tab-btn__label">People</span>
             </button>
+            <button class="tab-btn" data-tab="review" role="tab" aria-selected="false" aria-controls="panel-review" title="Review">
+                <svg class="tab-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/></svg>
+                <span class="tab-btn__label">Review</span>
+                <span class="tab-btn__count" id="reviewCount" hidden></span>
+            </button>
             <button class="tab-btn" data-tab="dashboard" role="tab" aria-selected="false" aria-controls="panel-dashboard" title="Dashboard">
                 <svg class="tab-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
                 <span class="tab-btn__label">Dashboard</span>
@@ -166,6 +171,15 @@
                         </div>
                     </div>
 
+                    <!-- Not here yet (research A4) -->
+                    <div class="card absence-card">
+                        <div class="card__header">
+                            <h3 class="card__title">Not here yet</h3>
+                            <span class="card__badge-sub" id="absenceSummary" role="status"></span>
+                        </div>
+                        <div class="absence-list" id="absenceList"></div>
+                    </div>
+
                     <!-- Auto-Attend Toggle -->
                     <div class="card">
                         <div class="card__header">
@@ -286,6 +300,7 @@
                         <button class="filter-pill" data-filter="Present">Present (<span id="countPillPresent">0</span>)</button>
                         <button class="filter-pill" data-filter="Late">Late (<span id="countPillLate">0</span>)</button>
                         <button class="filter-pill" data-filter="Unknown">Unknown (<span id="countPillUnknown">0</span>)</button>
+                        <button class="filter-pill" data-filter="Review" title="Matches waiting for review, or rejected. They do not count.">Review (<span id="countPillReview">0</span>)</button>
                     </div>
 
                     <!-- Sort Controls -->
@@ -744,32 +759,35 @@
                             <input type="number" id="settingsCooldown" class="form-input" min="1" placeholder="60">
                             <span class="field-error" id="errCooldown"></span>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="settingsLateAfter" class="form-label">Late After</label>
-                                <input type="time" id="settingsLateAfter" class="form-input">
-                                <span class="field-error" id="errLateAfter"></span>
-                            </div>
-                            <div class="form-group">
-                                <label for="settingsWorkingEnd" class="form-label">Working Hours End</label>
-                                <input type="time" id="settingsWorkingEnd" class="form-input">
-                                <span class="field-error" id="errWorkingEnd"></span>
-                            </div>
+                        <div class="form-group">
+                            <label for="settingsReviewMargin" class="form-label">Review margin (%)</label>
+                            <input type="number" id="settingsReviewMargin" class="form-input" min="0" max="50" step="1" placeholder="15">
+                            <p class="form-hint">A match within this much of the recognition threshold waits in Review before it counts. 0 turns review off.</p>
+                            <span class="field-error" id="errReviewMargin"></span>
                         </div>
-                        <fieldset class="form-group working-days">
-                            <legend class="form-label">Working days</legend>
-                            <div class="check-chips" id="settingsWorkingDays">
-                                <label class="check-chip"><input type="checkbox" name="workingDay" value="0"><span>Mon</span></label>
-                                <label class="check-chip"><input type="checkbox" name="workingDay" value="1"><span>Tue</span></label>
-                                <label class="check-chip"><input type="checkbox" name="workingDay" value="2"><span>Wed</span></label>
-                                <label class="check-chip"><input type="checkbox" name="workingDay" value="3"><span>Thu</span></label>
-                                <label class="check-chip"><input type="checkbox" name="workingDay" value="4"><span>Fri</span></label>
-                                <label class="check-chip"><input type="checkbox" name="workingDay" value="5"><span>Sat</span></label>
-                                <label class="check-chip"><input type="checkbox" name="workingDay" value="6"><span>Sun</span></label>
+                    </div>
+                </div>
+
+                <!-- Groups and schedules (research A3) -->
+                <div class="card settings-schedules-card">
+                    <div class="card__header">
+                        <h3 class="card__title">Groups and schedules</h3>
+                        <span class="card__badge-sub">Late, Left early and Absent follow each person's group. Saved with its own button.</span>
+                    </div>
+                    <div class="schedules-body">
+                        <div class="schedules-list" id="schedulesList"></div>
+                        <div class="schedules-add">
+                            <div class="form-group">
+                                <label for="newGroupName" class="form-label">New group</label>
+                                <input id="newGroupName" class="form-input" maxlength="40" placeholder="e.g. Class 10 B" autocomplete="off">
                             </div>
-                            <p class="form-hint">A day without records counts as Absent only on a working day.</p>
-                            <span class="field-error" id="errWorkingDays"></span>
-                        </fieldset>
+                            <button type="button" class="btn btn--ghost btn--sm" id="btnAddGroup">Add group</button>
+                        </div>
+                        <span class="field-error" id="errSchedules" role="alert"></span>
+                        <div class="schedules-actions">
+                            <button type="button" class="btn btn--primary btn--sm" id="btnSaveSchedules" disabled>Save groups and schedules</button>
+                            <span class="card__badge-sub" id="schedulesStatus" role="status"></span>
+                        </div>
                     </div>
                 </div>
 
@@ -874,6 +892,7 @@
                                 <tr>
                                     <th>Name</th>
                                     <th class="col-num">ID</th>
+                                    <th>Group</th>
                                     <th class="col-num">Images</th>
                                     <th>Consent</th>
                                     <th>Last seen</th>
@@ -913,6 +932,11 @@
                             <div><dt>Images</dt><dd class="mono" id="personImages">--</dd></div>
                             <div><dt>Consent</dt><dd id="personConsent">--</dd></div>
                         </dl>
+                    </div>
+                    <div class="person-group">
+                        <label for="personGroup" class="form-label">Group</label>
+                        <select id="personGroup" class="input-select form-input"></select>
+                        <span class="field-error" id="errPersonGroup" role="alert"></span>
                     </div>
                     <form class="person-rename" id="personRenameForm" autocomplete="off">
                         <label for="personNewName" class="form-label">Name</label>
@@ -1018,6 +1042,7 @@
                                 <th class="col-num">Late</th>
                                 <th class="col-num">Absent</th>
                                 <th class="col-num">Not seen yet</th>
+                                <th class="col-num">Left early</th>
                             </tr>
                         </thead>
                         <tbody id="reportTotalsBody"></tbody>
@@ -1039,6 +1064,7 @@
                                 <th class="col-num">ID</th>
                                 <th>Name</th>
                                 <th>Status</th>
+                                <th>Left early</th>
                                 <th>First seen</th>
                                 <th>Last seen</th>
                                 <th class="col-num">Records</th>
@@ -1049,6 +1075,22 @@
                     </table>
                 </div>
             </div>
+        </section>
+
+        <!-- Review queue (research A1) -->
+        <section class="panel" id="panel-review" role="tabpanel" aria-labelledby="title-review">
+            <div class="panel-head">
+                <h2 class="panel-title" id="title-review">Review</h2>
+                <p class="panel-sub">Matches that came close to the recognition threshold. They count only once someone confirms them.</p>
+            </div>
+            <div class="panel-header-row">
+                <div class="mode-switch" id="reviewStates" role="group" aria-label="Show">
+                    <button type="button" class="mode-switch__btn" data-state="pending" aria-pressed="true">Waiting</button>
+                    <button type="button" class="mode-switch__btn" data-state="confirmed" aria-pressed="false">Confirmed</button>
+                    <button type="button" class="mode-switch__btn" data-state="rejected" aria-pressed="false">Rejected</button>
+                </div>
+            </div>
+            <div class="review-list" id="reviewList"></div>
         </section>
 
         <!-- Audit log -->
@@ -1131,5 +1173,7 @@
     <script src="/static/js/audit.js?v={{ asset_v }}"></script>
     <script src="/static/js/people.js?v={{ asset_v }}"></script>
     <script src="/static/js/reports.js?v={{ asset_v }}"></script>
+    <script src="/static/js/review.js?v={{ asset_v }}"></script>
+    <script src="/static/js/absence.js?v={{ asset_v }}"></script>
 </body>
 </html>

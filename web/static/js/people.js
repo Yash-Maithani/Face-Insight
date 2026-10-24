@@ -1,7 +1,7 @@
 /* ==========================================================================
    people.js - People tab
    The list of registered people with search, and one page per person:
-   their attendance day by day over a date range, and renaming.
+   their attendance day by day over a date range, renaming and their group.
    URL: #people for the list, #people/3 for person 3.
    ========================================================================== */
 
@@ -26,6 +26,8 @@
     const idEl = document.getElementById("personId");
     const imagesEl = document.getElementById("personImages");
     const consentEl = document.getElementById("personConsent");
+    const groupSelect = document.getElementById("personGroup");
+    const errGroup = document.getElementById("errPersonGroup");
     const renameForm = document.getElementById("personRenameForm");
     const renameInput = document.getElementById("personNewName");
     const errRename = document.getElementById("errPersonRename");
@@ -52,6 +54,21 @@
 
     function statusBadge(status) {
         return `<span class="status-badge ${STATUS_CLASS[status] || ""}">${App.escapeHtml(status)}</span>`;
+    }
+
+    // The groups a person can be moved to
+    async function loadGroups(selected) {
+        try {
+            const res = await fetch("/api/schedules");
+            if (!res.ok) throw new Error("schedules");
+            const data = await res.json();
+            groupSelect.innerHTML = data.groups
+                .map((g) => `<option value="${App.escapeHtml(g.name)}">${App.escapeHtml(g.name)} (late after ${App.escapeHtml(g.late_after)})</option>`)
+                .join("");
+            groupSelect.value = selected;
+        } catch (err) {
+            groupSelect.innerHTML = `<option>${App.escapeHtml(selected || "Default")}</option>`;
+        }
     }
 
     function when(iso) {
@@ -82,7 +99,7 @@
 
     function matches(p, q) {
         if (!q) return true;
-        return p.name.toLowerCase().includes(q) || String(p.person_id) === q;
+        return p.name.toLowerCase().includes(q) || String(p.person_id) === q || (p.group || "").toLowerCase().includes(q);
     }
 
     function renderList() {
@@ -100,6 +117,7 @@
                 <tr tabindex="0" data-key-activate data-id="${p.person_id}">
                     <td data-label="Name"><strong>${App.escapeHtml(p.name)}</strong></td>
                     <td data-label="ID" class="col-num"><code>${p.person_id}</code></td>
+                    <td data-label="Group">${App.escapeHtml(p.group || "Default")}</td>
                     <td data-label="Images" class="col-num">${p.image_count}</td>
                     <td data-label="Consent">${p.consent_at ? when(p.consent_at) : "Not recorded"}</td>
                     <td data-label="Last seen" class="mono">${p.last_seen ? App.escapeHtml(p.last_seen.slice(0, 16)) : "Never"}</td>
@@ -206,6 +224,7 @@
         imagesEl.textContent = p.image_count !== undefined ? p.image_count : "--";
         consentEl.textContent = p.consent_at ? String(p.consent_at).replace("T", " ").slice(0, 16) : "Not recorded";
         if (document.activeElement !== renameInput) renameInput.value = p.name;
+        if (p.group !== undefined && document.activeElement !== groupSelect) loadGroups(p.group);
         document.title = `${p.name} | People | Face Insight`;
     }
 
@@ -226,7 +245,7 @@
                 return `
                 <tr class="${expandable ? "day-row" : ""}" data-date="${d.date}" ${expandable ? 'tabindex="0" data-key-activate aria-expanded="false"' : ""}>
                     <td data-label="Date" class="mono">${d.date}</td>
-                    <td data-label="Status">${statusBadge(d.status)}${d.manual ? ' <span class="manual-tag">Manual</span>' : ""}</td>
+                    <td data-label="Status">${statusBadge(d.status)}${d.left_early ? ' <span class="review-tag">Left early</span>' : ""}${d.manual ? ' <span class="manual-tag">Manual</span>' : ""}</td>
                     <td data-label="First seen" class="mono">${d.first_seen || "--"}</td>
                     <td data-label="Last seen" class="mono">${d.last_seen || "--"}</td>
                     <td data-label="Records" class="col-num">${d.sightings}</td>
@@ -262,6 +281,27 @@
     }
 
     [fromInput, toInput].forEach((el) => el.addEventListener("change", loadPerson));
+
+    groupSelect.addEventListener("change", async () => {
+        errGroup.textContent = "";
+        const group = groupSelect.value;
+        try {
+            const res = await fetch(`/api/people/${currentId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ group }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                errGroup.textContent = data.error || "The group was not changed.";
+                return;
+            }
+            App.showToast(`Moved to ${group}. Late and Absent now follow its schedule.`, "success");
+            loadPerson();
+        } catch (err) {
+            errGroup.textContent = "Could not reach the server.";
+        }
+    });
 
     btnBack.addEventListener("click", () => {
         App.route.setArg("people", "");

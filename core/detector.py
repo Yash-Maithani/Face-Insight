@@ -147,6 +147,9 @@ class Detector:
 
     def update_threshold(self, value):
         self._threshold = value
+        # The engine uses it to decide which matches need review
+        if hasattr(self._engine, "set_threshold"):
+            self._engine.set_threshold(value)
 
     def update_names(self, names):
         self._names = {int(k): v for k, v in names.items()}

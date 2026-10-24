@@ -35,6 +35,9 @@ SCRIPTS = [
     "test_migration.py",
     "test_people.py",
     "test_reports.py",
+    "test_schedules.py",
+    "test_review_queue.py",
+    "test_cooldown_persistence.py",
 ]
 
 RESULT = re.compile(r"RESULTS: (\d+) passed, (\d+) failed")

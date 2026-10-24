@@ -12,7 +12,9 @@
 | `core/camera_utils.py` | Picks the camera backend for the operating system. |
 | `attendance/engine.py` | Decides whether a sighting becomes a record: cooldown, Present, Late or Unknown, and manual marks. |
 | `attendance/exporter.py` | Excel and CSV export of raw records. |
-| `attendance/summary.py` | The daily summary: one status per person per day, first and last seen. |
+| `attendance/summary.py` | The daily summary: one status per person per day, Left early, first and last seen. |
+| `attendance/schedules.py` | Groups and their schedules, and how Late and Left early are judged. |
+| `attendance/web.py` | The schedules, absence and review queue APIs. |
 | `attendance/reports.py` | Reports for a date range and a set of people, as CSV or PDF (ReportLab), from the same rows. |
 | `people/registry.py` | Registered people. The `persons` collection is the source of truth; `config.json` keeps a copy of the names for offline starts. |
 | `people/migration.py` | The version 2 data migration, run on start and by `tools/migrate_v2.py`. Backs up first, safe to run twice. |
@@ -24,7 +26,7 @@
 | `db/firebase_client.py` | Optional mirror to Firebase. Does nothing unless it is configured. |
 | `web/templates/index.html` | The app page. `login.html` and `setup.html` are the only others. |
 | `web/static/js/app.js` | Shared code: socket, theme, URL handling, dialogs, toasts, and the Live Monitor tab. |
-| `web/static/js/*.js` | One file each for Attendance, People, Dashboard, Reports, Register, Settings and the Audit log. |
+| `web/static/js/*.js` | One file each for Attendance, People, Review, Dashboard, Reports, Register, Settings, the Audit log and the "Not here yet" list. |
 | `web/static/css/style.css` | All the styles. The colour tokens are at the top. |
 
 ## What happens to a frame
@@ -61,11 +63,29 @@ Collecting face images registers the person. A new ID needs consent. An ID that 
 Records are stored per sighting and never changed by the summary. The daily summary reads them and gives each person one status per day:
 
 - The first camera sighting decides Present or Late. A manual mark that day overrides it, and the latest manual mark wins.
+- Left early is a flag beside the status: the camera saw the person more than once that working day and the last sighting was before the end.
 - A working day with no record, up to today, is Absent. Today becomes Absent only after the end of the working day; before that it is "Not seen yet".
+- Records waiting for review, or rejected in review, do not count anywhere until confirmed.
 - Days before a person was registered, future days and non-working days without records are left out.
 - Unknown faces belong to nobody. Their records have `person_id: null`, and the recogniser's closest guess is kept in `guessed_person_id`.
 
 Reports and the People page both use this summary. A CSV and a PDF of the same report contain the same rows.
+
+## Groups and schedules
+
+Every person belongs to one group. Each group has working days, a start, a late cut-off and an end. The Default group always exists and its schedule is the `attendance` block in `config.json` (`late_after`, `working_hours_end`, `working_days`, `start`), so older settings keep working. Other groups are in `config.json` `schedules`, and people outside Default are listed in `person_groups`. All of this lives in the config, not the database, so lateness is still judged by the right schedule while MongoDB is down.
+
+Times are the local time of the computer running the app, compared as times of day. A sighting on a group's non-working day is never Late.
+
+## Cooldowns and unknown faces
+
+The cooldown stops one person being logged again and again. On start and after the database reconnects, it is rebuilt from today's camera records, so a restart does not log anyone twice. Manual marks never start a cooldown.
+
+Each unknown face gets its own cooldown, keyed by the registered person it came closest to. That keeps two strangers apart in most cases; when there is no trained model, all unknown faces share one cooldown.
+
+## The review queue
+
+A known match whose distance falls in the top `review_margin` percent below the threshold (15 by default) is saved with `review: "pending"`. It shows in the Attendance table and on the Review tab but does not count. Confirming it (`review: "confirmed"`) makes it a normal record; rejecting it keeps it, marked `rejected`, and it never counts. Both store who decided and when, and both are audited.
 
 ## The version 2 migration
 
@@ -120,9 +140,13 @@ Every route needs a signed-in admin, apart from `/login`, `/setup` and static fi
 | POST | `/api/train` | Train the recogniser |
 | GET | `/api/persons` | Registered people with image counts |
 | DELETE | `/api/persons/<id>` | Remove a person and their images, then retrain. Their records are kept. |
-| GET | `/api/people` | Everyone registered, with image count, consent and last seen |
+| GET | `/api/people` | Everyone registered, with group, image count, consent and last seen |
 | GET | `/api/people/<id>?from=&to=` | One person's daily summary, totals and records (last 30 days by default) |
-| PATCH | `/api/people/<id>` `{name}` | Rename |
+| PATCH | `/api/people/<id>` `{name, group}` | Rename, or move to another group |
+| GET, PUT | `/api/schedules` | Groups with their schedules and member counts; PUT replaces them all (Default must stay, a group with people cannot be removed) |
+| GET | `/api/absent/today` | Who is scheduled today and has not been seen, and whether their late cut-off has passed |
+| GET | `/api/review?state=pending\|confirmed\|rejected` | The review queue |
+| POST | `/api/review/<id>` `{decision: confirm\|reject}` | Decide one |
 | GET | `/api/reports?from=&to=&people=` | Report preview. `people` is a comma-separated list of IDs; blank means everyone. |
 | GET | `/api/reports/export.csv`, `/api/reports/export.pdf` | The same report as a file. An empty report is a 404 with a message, never an empty file. |
 
@@ -136,6 +160,7 @@ Sent by the server:
 | `stats:update` | Counts changed |
 | `attendance:new` | A record was written |
 | `attendance:deleted` `{ids, date}` | Records were deleted |
+| `review:update` `{id, review, date}` | A review decision was made |
 | `collect:status`, `collect:progress`, `collect:done`, `collect:error` | Image collection |
 | `train:status`, `train:progress`, `train:done`, `train:error` | Training |
 

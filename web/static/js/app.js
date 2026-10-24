@@ -477,6 +477,7 @@
         monitor: "Live Monitor",
         attendance: "Attendance",
         people: "People",
+        review: "Review",
         dashboard: "Dashboard",
         reports: "Reports",
         register: "Register",
@@ -749,10 +750,21 @@
     const statKnown = document.getElementById("statKnown");
     const statPresent = document.getElementById("statPresent");
 
+    // Sidebar count of matches waiting for review
+    const reviewCount = document.getElementById("reviewCount");
+
+    function setReviewCount(n) {
+        if (typeof n !== "number") return;
+        reviewCount.hidden = n === 0;
+        reviewCount.textContent = n > 99 ? "99+" : String(n);
+        reviewCount.closest(".tab-btn").title = n ? `Review (${n} waiting)` : "Review";
+    }
+
     function applyStats(data) {
         if (!data) return;
         markUpdated();
         setDbConnected(data.db_connected);
+        setReviewCount(data.review_pending);
         if (data.fps !== undefined) statFps.textContent = data.fps;
         if (data.faces !== undefined) setKpi(statFaces, data.faces);
         if (data.known !== undefined) setKpi(statKnown, data.known);
@@ -939,7 +951,7 @@
             <span class="shape ${shapeClass}" aria-hidden="true"></span>
             <div class="event-item__info">
                 <div class="event-item__name">${escapeHtml(record.name || "Unknown")}</div>
-                <div class="event-item__meta">${[record.status, record.emotion].filter(Boolean).map(escapeHtml).join(" &middot; ")}</div>
+                <div class="event-item__meta">${[record.status, record.review === "pending" ? "Needs review" : "", record.emotion].filter(Boolean).map(escapeHtml).join(" &middot; ")}</div>
             </div>
             <span class="event-item__time">${escapeHtml(record.time_in || "")}</span>
         `;

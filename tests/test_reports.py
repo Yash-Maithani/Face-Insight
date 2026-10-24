@@ -187,7 +187,7 @@ check("Every CSV row appears in the PDF, cell by cell", not missing and len(rep[
 check("PDF has the column headings", "\x1f".join(COLUMNS) in joined)
 check("PDF has the totals per person", "Days per person" in strings)
 check("PDF rows match the CSV rows", [row_values(r) for r in rep["rows"]] == [tuple(
-    int(x) if i in (1, 6) else x for i, x in enumerate(row)) for row in expected])
+    int(x) if i in (1, 7) else x for i, x in enumerate(row)) for row in expected])
 
 # ──────────────────────────────────────────────────────────────────────────
 section("5. Empty range and offline")

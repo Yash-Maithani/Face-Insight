@@ -11,9 +11,9 @@ import csv
 import io
 from datetime import datetime
 
-from attendance.summary import ABSENT, LATE, NOT_YET, PRESENT, daily_summary, person_totals
+from attendance.summary import ABSENT, LATE, LEFT_EARLY, NOT_YET, PRESENT, daily_summary, person_totals
 
-COLUMNS = ("Date", "Person ID", "Name", "Status", "First seen", "Last seen", "Sightings", "Manual")
+COLUMNS = ("Date", "Person ID", "Name", "Status", "Left early", "First seen", "Last seen", "Sightings", "Manual")
 MAX_RANGE_DAYS = 366
 
 
@@ -37,9 +37,11 @@ def parse_range(date_from, date_to, max_days=MAX_RANGE_DAYS):
     return start.isoformat(), end.isoformat()
 
 
-def build_report(records, persons, date_from, date_to, now, working_days, day_end):
-    """{range, generated, people, rows, totals}. `persons` is the chosen people, in order."""
-    rows = daily_summary(records, persons, date_from, date_to, now, working_days, day_end)
+def build_report(records, persons, date_from, date_to, now, working_days=None, day_end="17:30", schedule_of=None):
+    """{range, generated, people, rows, totals}. `persons` is the chosen people, in order.
+    `schedule_of(person)` gives each person's group schedule."""
+    rows = daily_summary(records, persons, date_from, date_to, now,
+                         working_days or (0, 1, 2, 3, 4), day_end, schedule_of)
     return {
         "from": date_from,
         "to": date_to,
@@ -53,6 +55,7 @@ def build_report(records, persons, date_from, date_to, now, working_days, day_en
 def row_values(row):
     return (
         row["date"], row["person_id"], row["name"], row["status"],
+        "Yes" if row.get("left_early") else "No",
         row["first_seen"] or "", row["last_seen"] or "", row["sightings"],
         "Yes" if row["manual"] else "No",
     )
@@ -101,8 +104,9 @@ def to_pdf(report, compress=True):
         Spacer(1, 6 * mm),
         Paragraph("Days per person", styles["Heading2"]),
     ]
-    totals = [("Person ID", "Name", PRESENT, LATE, ABSENT, NOT_YET)]
-    totals += [(t["person_id"], t["name"], t[PRESENT], t[LATE], t[ABSENT], t[NOT_YET]) for t in report["totals"]]
+    totals = [("Person ID", "Name", PRESENT, LATE, ABSENT, NOT_YET, LEFT_EARLY)]
+    totals += [(t["person_id"], t["name"], t[PRESENT], t[LATE], t[ABSENT], t[NOT_YET], t[LEFT_EARLY])
+               for t in report["totals"]]
     story.append(Table(totals, repeatRows=1, style=grid, hAlign="LEFT"))
     story += [Spacer(1, 6 * mm), Paragraph("Every day", styles["Heading2"])]
     rows = [COLUMNS] + [row_values(r) for r in report["rows"]]

@@ -1,10 +1,13 @@
 """
 people/registry.py
-Registered people: who they are, when they agreed to have their face stored.
+Registered people: who they are, which group they belong to, and when they
+agreed to have their face stored.
 
 The `persons` collection in MongoDB is the source of truth. `config.json`
-keeps a copy of the names (`names`), rewritten after every change, so the
-recogniser can still put names on faces while the database is unreachable.
+keeps a copy of the names (`names`) and groups (`person_groups`, only for
+people outside the Default group), rewritten after every change, so the
+recogniser can still put names on faces, and lateness is still judged by
+the right schedule, while the database is unreachable.
 Adding, renaming or removing a person needs the database.
 
 A name that is in the copy but not yet in the database (an older install
@@ -14,6 +17,8 @@ counts as registered until the migration imports it.
 
 import logging
 from datetime import datetime
+
+from attendance.schedules import DEFAULT_GROUP
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +68,16 @@ class PersonRegistry:
         names = self._load_config().get("names") or {}
         return {str(k): v for k, v in names.items()}
 
+    def group_of(self, person_id, cfg=None):
+        """The group from the config copy. Fast enough for every new record."""
+        cfg = cfg if cfg is not None else self._load_config()
+        return (cfg.get("person_groups") or {}).get(str(person_id), DEFAULT_GROUP)
+
+    @staticmethod
+    def _known_group(group, cfg):
+        """A group that no longer has a schedule (config edited by hand) counts as Default."""
+        return group if group == DEFAULT_GROUP or group in (cfg.get("schedules") or {}) else DEFAULT_GROUP
+
     def _db_persons(self):
         db = self._get_db()
         if db is None or not db.is_connected:
@@ -71,18 +86,19 @@ class PersonRegistry:
 
     def list(self):
         """(people sorted by ID, database_available). Each person has
-        person_id, name, consent_at, created and saved (False while only in
-        the config copy)."""
-        cached = self._cached_names()
+        person_id, name, group, consent_at, created and saved (False while
+        only in the config copy)."""
+        cfg = self._load_config()
+        cached = {str(k): v for k, v in (cfg.get("names") or {}).items()}
         stored = self._db_persons()
         people = {}
         for p in stored or []:
-            people[p["person_id"]] = dict(p, saved=True)
+            people[p["person_id"]] = dict(p, saved=True, group=self._known_group(p.get("group") or DEFAULT_GROUP, cfg))
         for key, name in cached.items():
             pid = int(key)
             if pid not in people:
-                people[pid] = {"person_id": pid, "name": name, "consent_at": None,
-                               "created": None, "saved": False}
+                people[pid] = {"person_id": pid, "name": name, "consent_at": None, "created": None,
+                               "saved": False, "group": self._known_group(self.group_of(pid, cfg), cfg)}
         return [people[k] for k in sorted(people)], stored is not None
 
     def get(self, person_id):
@@ -97,10 +113,13 @@ class PersonRegistry:
     def sync_cache(self):
         """Rewrite the names copy in config.json from the registry and tell
         the recogniser. Returns the names."""
-        names = self.names()
+        everyone = self.list()[0]
+        names = {str(p["person_id"]): p["name"] for p in everyone}
+        groups = {str(p["person_id"]): p["group"] for p in everyone if p["group"] != DEFAULT_GROUP}
         current = self._load_config()
-        if {str(k): v for k, v in (current.get("names") or {}).items()} != names:
+        if {str(k): v for k, v in (current.get("names") or {}).items()} != names                 or (current.get("person_groups") or {}) != groups:
             current["names"] = names
+            current["person_groups"] = groups
             self._save_config(current)
         if self._on_change:
             self._on_change(names)
@@ -193,6 +212,37 @@ class PersonRegistry:
             raise PersonError(OFFLINE_MESSAGE, 503)
         self.sync_cache()
         return existing["name"], dict(person, saved=True)
+
+    def set_group(self, person_id, group, known_groups):
+        """Move a person to another group. Returns (old group, person)."""
+        if group not in known_groups:
+            raise PersonError(f"There is no group called {group}.", 404)
+        db = self._require_db()
+        existing = self.get(person_id)
+        if existing is None:
+            raise PersonError("Person not found.", 404)
+        if not existing.get("saved"):
+            db.insert_person({"person_id": person_id, "name": existing["name"],
+                              "consent_at": None, "created": None, "imported_at": self._now()})
+        person = db.update_person(person_id, {"group": group})
+        if person is None:
+            raise PersonError(OFFLINE_MESSAGE, 503)
+        self.sync_cache()
+        return existing["group"], dict(person, saved=True, group=group)
+
+    def move_group(self, old, new):
+        """Move everyone in group `old` to `new`. Returns how many."""
+        db = self._require_db()
+        moved = 0
+        for p in self.list()[0]:
+            if p["group"] == old:
+                if not p.get("saved"):
+                    db.insert_person({"person_id": p["person_id"], "name": p["name"],
+                                      "consent_at": None, "created": None, "imported_at": self._now()})
+                db.update_person(p["person_id"], {"group": new})
+                moved += 1
+        self.sync_cache()
+        return moved
 
     def remove(self, person_id):
         """Remove a person from the database and the config copy. Returns them."""

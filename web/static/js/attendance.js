@@ -13,12 +13,15 @@
     const today = () => App.dates.today();
     let range = initialRange();
     let records = [];
-    let currentFilter = "All"; // "All" | "Present" | "Late" | "Unknown"
+    let currentFilter = "All"; // "All" | "Present" | "Late" | "Unknown" | "Review"
     let currentSort = "time_desc"; // "time_desc" | "time_asc" | "name_asc" | "status_prio"
     let sortCol = null;
     let sortAsc = true;
 
     const isRange = () => range.from !== range.to;
+    // Matches waiting for review, or rejected in review, do not count
+    const counted = (r) => r.review !== "pending" && r.review !== "rejected";
+    const REVIEW_TEXT = { pending: "Needs review", rejected: "Rejected in review", confirmed: "Confirmed in review" };
     const rangeKey = (r) => `${r.from}..${r.to}`;
     const inRange = (date) => date >= range.from && date <= range.to;
     const periodText = () => (isRange() ? "in this date range" : "for this date");
@@ -62,6 +65,7 @@
     const countPillPresent = document.getElementById("countPillPresent");
     const countPillLate = document.getElementById("countPillLate");
     const countPillUnknown = document.getElementById("countPillUnknown");
+    const countPillReview = document.getElementById("countPillReview");
 
     const sortSelect = document.getElementById("attendanceSortSelect");
     const table = document.getElementById("attendanceTable");
@@ -194,9 +198,11 @@
     function updateCountsAndKpis() {
         // Loading, failed or offline: there is no count, and zero would be a false statement
         const offline = isLoading || loadError || App.db.isConnected() === false;
-        const count = (status) => (offline ? "--" : records.filter((r) => r.status === status).length);
+        const kept = records.filter(counted);
+        const count = (status) => (offline ? "--" : kept.filter((r) => r.status === status).length);
 
-        const total = offline ? "--" : records.length;
+        const total = offline ? "--" : kept.length;
+        const inReview = offline ? "--" : records.length - kept.length;
         const present = count("Present");
         const late = count("Late");
         const unknown = count("Unknown");
@@ -212,6 +218,7 @@
         App.setKpi(countPillPresent, present);
         App.setKpi(countPillLate, late);
         App.setKpi(countPillUnknown, unknown);
+        App.setKpi(countPillReview, inReview);
     }
 
     // ── Filtering and Sorting ────────────────────────────────────────────
@@ -309,9 +316,12 @@
     }
 
     function getFilteredAndSortedRecords() {
-        let filtered = records;
-        if (currentFilter !== "All") {
-            filtered = records.filter((r) => r.status === currentFilter);
+        let filtered;
+        if (currentFilter === "Review") {
+            filtered = records.filter((r) => !counted(r));
+        } else {
+            filtered = records.filter(counted);
+            if (currentFilter !== "All") filtered = filtered.filter((r) => r.status === currentFilter);
         }
 
         const sorted = [...filtered];
@@ -398,7 +408,7 @@
             <td data-label="Name"><strong>${App.escapeHtml(rec.name || "Unknown")}</strong></td>
             <td data-label="ID" class="col-num"><code>${personIdText(rec)}</code></td>
             <td data-label="Time in" class="mono">${App.escapeHtml(rec.time_in || "--")}</td>
-            <td data-label="Status"><span class="status-badge ${statusClass}">${App.escapeHtml(rec.status || "Unknown")}</span></td>
+            <td data-label="Status"><span class="status-badge ${statusClass}">${App.escapeHtml(rec.status || "Unknown")}</span>${rec.review && rec.review !== "confirmed" ? ` <span class="review-tag review-tag--${rec.review}">${REVIEW_TEXT[rec.review] || ""}</span>` : ""}</td>
             <td data-label="Emotion">${App.escapeHtml(rec.emotion || "--")}</td>
             <td data-label="Match" title="${App.escapeHtml(match.detail)}"><span>${matchHtml}</span></td>
             <td data-label="Manual">${manualText}</td>
@@ -420,6 +430,8 @@
                 App.renderState(tableEmpty, "error", `Could not load records ${periodText()}.`, fetchRecords);
             } else if (App.db.isConnected() === false) {
                 App.renderState(tableEmpty, "error", `Database offline. Records ${periodText()} cannot be loaded.`, fetchRecords);
+            } else if (currentFilter === "Review") {
+                App.renderState(tableEmpty, "empty", `Nothing waiting for review or rejected ${periodText()}.`);
             } else if (currentFilter !== "All" && records.length > 0) {
                 App.renderState(tableEmpty, "empty", `No ${currentFilter} records ${periodText()}.`);
             } else {
@@ -490,6 +502,15 @@
     }
 
     App.socket.on("attendance:deleted", (data) => removeRecords(data && data.ids));
+
+    // A review decision changes whether a record counts
+    App.socket.on("review:update", (data) => {
+        const rec = data && records.find((r) => r.id === data.id);
+        if (!rec) return;
+        rec.review = data.review;
+        updateCountsAndKpis();
+        renderTable();
+    });
 
     // A record another tab asked to show (a click in the Live Monitor feed)
     let pendingRecordId = null;
@@ -566,6 +587,10 @@
                     <span class="drawer-meta-label">Match</span>
                     <span class="drawer-meta-val">${App.escapeHtml(match.detail)}</span>
                 </div>
+                ${rec.review ? `<div class="drawer-meta-row">
+                    <span class="drawer-meta-label">Review</span>
+                    <span class="drawer-meta-val">${REVIEW_TEXT[rec.review] || App.escapeHtml(rec.review)}${rec.review === "pending" ? ". It does not count until confirmed on the Review tab." : ""}</span>
+                </div>` : ""}
                 <div class="drawer-meta-row">
                     <span class="drawer-meta-label">Type</span>
                     <span class="drawer-meta-val">${rec.manual ? "Marked manually" : "Detected by camera"}</span>
@@ -763,7 +788,10 @@
             if (!exists) {
                 records.unshift(record);
                 updateCountsAndKpis();
-                if (currentFilter === "All" || currentFilter === record.status) {
+                const show = counted(record)
+                    ? currentFilter === "All" || currentFilter === record.status
+                    : currentFilter === "Review";
+                if (show) {
                     tableEmpty.style.display = "none";
                     table.style.display = "table";
                     const tr = createTableRow(record);

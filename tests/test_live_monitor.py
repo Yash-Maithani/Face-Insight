@@ -158,7 +158,7 @@ check("/ returns 200", html_resp.status == 200)
 check("Has Socket.IO CDN", "socket.io" in html.lower())
 _css = open(os.path.join(PROJECT_ROOT, "web", "static", "css", "style.css"), encoding="utf-8").read()
 check("Has IBM Plex Sans font (served by the app)", "font-family: 'IBM Plex Sans'" in _css)
-check("Has 8 tabs", html.count('data-tab=') == 8)
+check("Has 9 tabs", html.count('data-tab=') == 9)
 
 # WebSocket test
 import socketio as sio_module

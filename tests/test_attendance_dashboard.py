@@ -186,7 +186,7 @@ check("Past record date matches", past_records[0]["date"] == yesterday)
 # ── 4. Excel & CSV Export Verification ───────────────────────────────
 section("4. Excel & CSV Export Verification")
 
-expected_cols = ["Name", "ID", "Time In", "Status", "Emotion", "Confidence", "Manual"]
+expected_cols = ["Date", "Name", "ID", "Time In", "Status", "Emotion", "Confidence", "Manual", "Review"]
 
 # CSV Export for today
 res_csv = client.get(f"/api/export/csv?date={today}")

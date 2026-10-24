@@ -260,9 +260,9 @@ check("Unknown status is 'Unknown'", r_u1["status"] == "Unknown")
 r_u2 = engine.process_detection(-2, False, "Angry", 20.0)
 check("Second unknown within cooldown blocked (shared)", r_u2 is None)
 
-# 5c. Before/after late_after -> Present / Late
+# 5c. Before/after late_after -> Present / Late (on a working day: 16 June 2025 is a Monday)
 fake_db2 = FakeDB()
-time_early = datetime(2025, 6, 15, 8, 30, 0)
+time_early = datetime(2025, 6, 16, 8, 30, 0)
 engine2 = AttendanceEngine(
     {"names": {2: "Bob"}, "attendance": {"cooldown_minutes": 0, "late_after": "09:30",
                                           "working_hours_end": "17:30", "auto_attend": True}},
@@ -271,7 +271,7 @@ engine2 = AttendanceEngine(
 r_present = engine2.process_detection(2, True, "Neutral", 80.0)
 check("Before late_after -> Present", r_present is not None and r_present["status"] == "Present")
 
-time_late = datetime(2025, 6, 15, 10, 0, 0)
+time_late = datetime(2025, 6, 16, 10, 0, 0)
 engine2._clock = lambda: time_late
 r_late = engine2.process_detection(3, True, "Happy", 85.0)
 check("After late_after -> Late", r_late is not None and r_late["status"] == "Late")

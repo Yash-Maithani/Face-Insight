@@ -4,7 +4,7 @@ People and Reports APIs.
 
 GET   /api/people                       everyone registered, with image count and last seen
 GET   /api/people/<id>?from=&to=        one person: daily summary, totals and the records behind it
-PATCH /api/people/<id>  {name}          rename
+PATCH /api/people/<id>  {name, group}   rename, or move to another group
 GET   /api/reports?from=&to=&people=    report preview (people: comma-separated IDs, blank = everyone)
 GET   /api/reports/export.csv | .pdf    the same report as a file
 """
@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, Response, jsonify, request
 
 from attendance.reports import RangeError, build_report, parse_range, to_csv, to_pdf
-from attendance.summary import working_days_of
+from attendance.schedules import DEFAULT_GROUP, schedules_of
 from people.registry import PersonError
 
 OFFLINE = {"error": "Database offline. Reports need the database.", "db_connected": False}
@@ -23,10 +23,10 @@ OFFLINE = {"error": "Database offline. Reports need the database.", "db_connecte
 def create_blueprint(get_db, people, load_config, audit_event, image_counts, clock=datetime.now):
     bp = Blueprint("people", __name__)
 
-    def rules():
-        cfg = load_config()
-        att = cfg.get("attendance") or {}
-        return working_days_of(cfg), att.get("working_hours_end", "17:30")
+    def schedule_lookup():
+        """person -> their group's schedule (Default if the group is gone)."""
+        scheds = schedules_of(load_config())
+        return lambda p: scheds.get(p.get("group") or DEFAULT_GROUP, scheds[DEFAULT_GROUP])
 
     def range_args(default_days=30):
         """(from, to) from the query string, or the last `default_days` days."""
@@ -42,8 +42,7 @@ def create_blueprint(get_db, people, load_config, audit_event, image_counts, clo
         records = db.find_logs(date_from, date_to, [p["person_id"] for p in person_list])
         if records is None:
             return None
-        working_days, day_end = rules()
-        report = build_report(records, person_list, date_from, date_to, clock(), working_days, day_end)
+        report = build_report(records, person_list, date_from, date_to, clock(), schedule_of=schedule_lookup())
         if keep_records:
             report["records"] = records
         return report
@@ -85,6 +84,7 @@ def create_blueprint(get_db, people, load_config, audit_event, image_counts, clo
             result.append({
                 "person_id": p["person_id"],
                 "name": p["name"],
+                "group": p["group"],
                 "consent_at": p.get("consent_at"),
                 "created": p.get("created"),
                 "saved": p.get("saved", False),
@@ -114,9 +114,17 @@ def create_blueprint(get_db, people, load_config, audit_event, image_counts, clo
     @bp.route("/api/people/<int:person_id>", methods=["PATCH"])
     def person_rename(person_id):
         data = request.get_json(silent=True) or {}
-        old_name, person = people.rename(person_id, data.get("name"))
-        if old_name != person["name"]:
-            audit_event("person.renamed", target=person_id, details={"from": old_name, "to": person["name"]})
+        if "name" not in data and "group" not in data:
+            return jsonify({"error": "Send a name or a group."}), 400
+        person = None
+        if "name" in data:
+            old_name, person = people.rename(person_id, data.get("name"))
+            if old_name != person["name"]:
+                audit_event("person.renamed", target=person_id, details={"from": old_name, "to": person["name"]})
+        if "group" in data:
+            old_group, person = people.set_group(person_id, data.get("group"), schedules_of(load_config()))
+            if old_group != person["group"]:
+                audit_event("person.group_changed", target=person_id, details={"from": old_group, "to": person["group"]})
         return jsonify({"ok": True, "person": person})
 
     # ── reports ───────────────────────────────────────────────────────────
